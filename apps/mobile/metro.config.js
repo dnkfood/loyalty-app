@@ -1,3 +1,8 @@
+// Ensure NODE_ENV is set for expo-router
+if (!process.env.NODE_ENV) {
+  process.env.NODE_ENV = 'production';
+}
+
 const { getDefaultConfig } = require('expo/metro-config');
 const path = require('path');
 
