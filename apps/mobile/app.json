@@ -48,8 +48,7 @@
             "minSdkVersion": 26
           }
         }
-      ],
-      "./plugins/with-node-env"
+      ]
     ],
     "experiments": {
       "typedRoutes": true
