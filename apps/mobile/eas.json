@@ -6,6 +6,9 @@
   "build": {
     "base": {
       "node": "20.18.0",
+      "pnpm": {
+        "version": "9.15.0"
+      },
       "env": {
         "EXPO_USE_METRO_WORKSPACE_ROOT": "1"
       }
