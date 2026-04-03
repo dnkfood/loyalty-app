@@ -1,0 +1,31 @@
+version: '3.9'
+
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: loyalty-postgres-test
+    environment:
+      POSTGRES_USER: loyalty_test
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_DB: loyalty_test_db
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loyalty_test -d loyalty_test_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis-test:
+    image: redis:7-alpine
+    container_name: loyalty-redis-test
+    ports:
+      - "6380:6379"
+    command: redis-server --save ""
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10

@@ -1,0 +1,183 @@
+// apps/bff/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String    @id @default(uuid())
+  phone            String    @unique
+  externalGuestId  String?   @unique @map("external_guest_id")
+  name             String?
+  email            String?
+  birthDate        DateTime? @map("birth_date")
+  avatarUrl        String?   @map("avatar_url")
+  consentGiven     Boolean   @default(false) @map("consent_given")
+  consentGivenAt   DateTime? @map("consent_given_at")
+  consentVersion   String?   @map("consent_version")
+  isActive         Boolean   @default(true) @map("is_active")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  sessions         AuthSession[]
+  pushTokens       PushToken[]
+
+  @@map("users")
+}
+
+model AuthSession {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  refreshToken String   @map("refresh_token") // bcrypt hash
+  deviceId     String?  @map("device_id")
+  deviceInfo   Json?    @map("device_info")
+  ipAddress    String?  @map("ip_address")
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("auth_sessions")
+}
+
+model OtpCode {
+  id          String    @id @default(uuid())
+  phone       String
+  codeHash    String    @map("code_hash") // bcrypt hash of OTP
+  attempts    Int       @default(0)
+  expiresAt   DateTime  @map("expires_at")
+  usedAt      DateTime? @map("used_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([phone])
+  @@map("otp_codes")
+}
+
+model LoyaltyCache {
+  userId          String   @id @map("user_id")
+  externalGuestId String   @map("external_guest_id")
+  balance         Int      @default(0)
+  statusLevel     String   @map("status_level")
+  statusName      String   @map("status_name")
+  nextLevelPoints Int?     @map("next_level_points")
+  segmentIds      String[] @map("segment_ids")
+  isCached        Boolean  @default(true) @map("is_cached")
+  cachedAt        DateTime @map("cached_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("loyalty_cache")
+}
+
+model TransactionLog {
+  id              String   @id @default(uuid())
+  eventId         String   @unique @map("event_id") // idempotency
+  externalGuestId String   @map("external_guest_id")
+  transactionId   String   @map("transaction_id")
+  type            String   // earn | spend | expire | correction
+  amount          Int
+  newBalance      Int      @map("new_balance")
+  description     String?
+  occurredAt      DateTime @map("occurred_at")
+  processedAt     DateTime @default(now()) @map("processed_at")
+
+  @@index([externalGuestId])
+  @@map("transaction_log")
+}
+
+model PushToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  platform  String   // ios | android
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("push_tokens")
+}
+
+model Campaign {
+  id          String    @id @default(uuid())
+  title       String
+  templateId  String?   @map("template_id")
+  body        String
+  data        Json?     // deep link and additional parameters
+  segmentIds  String[]  @map("segment_ids")
+  status      String    @default("draft") // draft | scheduled | running | done | failed
+  scheduledAt DateTime? @map("scheduled_at")
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  sentCount   Int       @default(0) @map("sent_count")
+  createdById String    @map("created_by_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@map("campaigns")
+}
+
+model PushNotificationLog {
+  id           String    @id @default(uuid())
+  campaignId   String?   @map("campaign_id")
+  userId       String    @map("user_id")
+  token        String
+  status       String    // sent | delivered | failed | opened | converted
+  errorCode    String?   @map("error_code")
+  sentAt       DateTime  @default(now()) @map("sent_at")
+  deliveredAt  DateTime? @map("delivered_at")
+  openedAt     DateTime? @map("opened_at")
+
+  @@index([campaignId])
+  @@index([userId])
+  @@map("push_notification_log")
+}
+
+model StaffUser {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  name         String
+  role         StaffRole
+  totpSecret   String?   @map("totp_secret")
+  totpEnabled  Boolean   @default(false) @map("totp_enabled")
+  isActive     Boolean   @default(true) @map("is_active")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  auditLogs    AuditLog[]
+
+  @@map("staff_users")
+}
+
+enum StaffRole {
+  SUPER_ADMIN
+  ADMIN
+  MARKETER
+  SUPPORT
+  ANALYST
+  CONTENT_MANAGER
+}
+
+model AuditLog {
+  id           String    @id @default(uuid())
+  staffUserId  String    @map("staff_user_id")
+  action       String    // LOGIN | CREATE_CAMPAIGN | VIEW_USER | SEND_PUSH | etc.
+  targetEntity String?   @map("target_entity") // User | Campaign | etc.
+  targetId     String?   @map("target_id")
+  details      Json?
+  ipAddress    String?   @map("ip_address")
+  userAgent    String?   @map("user_agent")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  staffUser    StaffUser @relation(fields: [staffUserId], references: [id])
+
+  @@index([staffUserId])
+  @@index([createdAt])
+  @@map("audit_log")
+}
