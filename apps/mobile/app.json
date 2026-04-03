@@ -21,7 +21,12 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.loyalty.app",
-      "permissions": ["USE_BIOMETRIC", "USE_FINGERPRINT"]
+      "permissions": [
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -47,6 +52,15 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "9d9af5e4-a28f-4ca1-848f-4f76677bd347"
+      }
+    },
+    "owner": "ttaxep"
   }
 }
