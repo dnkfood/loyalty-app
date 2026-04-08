@@ -3,7 +3,7 @@ import { UnauthorizedException, HttpException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { mockDeep, type DeepMockProxy } from 'jest-mock-extended';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SmsQueue } from '../notifications/sms/sms.queue';
