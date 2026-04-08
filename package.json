@@ -8,7 +8,6 @@
     "packages/*"
   ],
   "scripts": {
-    "postinstall": "turbo run build --filter=@loyalty/shared-types --filter=@loyalty/shared-utils",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "test": "turbo run test",
