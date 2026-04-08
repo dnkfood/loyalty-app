@@ -5,8 +5,7 @@ services:
     region: frankfurt
     plan: free
     buildCommand: |
-      corepack enable &&
-      corepack prepare pnpm@9.0.0 --activate &&
+      npm install -g pnpm@9.0.0 &&
       pnpm install --frozen-lockfile &&
       pnpm --filter @loyalty/shared-types build &&
       pnpm --filter @loyalty/shared-utils build &&
