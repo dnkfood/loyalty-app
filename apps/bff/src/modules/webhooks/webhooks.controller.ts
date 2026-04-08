@@ -13,7 +13,7 @@ import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import { WebhooksService } from './webhooks.service';
-import { verifyHmacSignature } from '@loyalty/shared-utils';
+import { verifyHmacSignature } from '../../common/utils/hmac';
 import type { LoyaltyWebhookPayload } from '@loyalty/shared-types';
 
 @ApiTags('webhooks')
