@@ -15,9 +15,6 @@
       "extends": "base",
       "developmentClient": true,
       "distribution": "internal",
-      "env": {
-        "NODE_ENV": "development"
-      },
       "android": {
         "buildType": "apk"
       },
@@ -28,18 +25,12 @@
     "preview": {
       "extends": "base",
       "distribution": "internal",
-      "env": {
-        "NODE_ENV": "production"
-      },
       "android": {
         "buildType": "apk"
       }
     },
     "production": {
       "extends": "base",
-      "env": {
-        "NODE_ENV": "production"
-      },
       "android": {
         "buildType": "app-bundle"
       }
