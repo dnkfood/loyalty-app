@@ -64,7 +64,7 @@ services:
       - key: APNS_KEY_PATH
         value: ""
       - key: LOYALTY_SYSTEM_API_URL
-        value: "http://45.84.87.169:5100/api/xml/gate"
+        value: "http://45.84.87.169:5100"
       - key: LOYALTY_SYSTEM_API_KEY
         value: ""
       - key: LOYALTY_WEBHOOK_SECRET

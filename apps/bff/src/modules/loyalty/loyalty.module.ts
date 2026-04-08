@@ -7,6 +7,6 @@ import { LoyaltySystemClient } from './loyalty-system.client';
 @Module({
   controllers: [LoyaltyController],
   providers: [LoyaltyService, LoyaltyCacheService, LoyaltySystemClient],
-  exports: [LoyaltyService, LoyaltyCacheService],
+  exports: [LoyaltyService, LoyaltyCacheService, LoyaltySystemClient],
 })
 export class LoyaltyModule {}

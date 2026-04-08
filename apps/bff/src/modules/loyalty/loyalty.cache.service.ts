@@ -37,18 +37,18 @@ export class LoyaltyCacheService {
       return { ...(JSON.parse(cached) as LoyaltyCacheDto), isCached: true };
     }
 
-    // Cache miss — fetch from loyalty system XML API
+    // Cache miss — fetch from loyalty system XML API (uses phone as guestId)
     try {
       const guest = await this.loyaltyClient.getGuestInfo(guestId);
       const now = new Date();
 
       const data: LoyaltyCacheDto = {
         userId: guestId,
-        externalGuestId: guestId,
+        externalGuestId: guest.cardCode || guestId,
         balance: guest.balance,
         statusLevel: guest.statusLevel,
-        statusName: guest.statusName,
-        nextLevelPoints: guest.nextLevelPoints,
+        statusName: guest.statusLevel,
+        nextLevelPoints: guest.nextLevelSumma != null ? Math.round(guest.nextLevelSumma) : null,
         segmentIds: [],
         isCached: false,
         cachedAt: now,

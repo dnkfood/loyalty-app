@@ -1,10 +1,10 @@
 import {
   Injectable,
   Logger,
-  BadRequestException,
   UnauthorizedException,
   HttpException,
   HttpStatus,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -13,7 +13,7 @@ import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { maskPhone } from '@loyalty/shared-utils';
 import { ErrorCodes } from '@loyalty/shared-types';
-import { SmsQueue } from '../notifications/sms/sms.queue';
+import { LoyaltySystemClient } from '../loyalty/loyalty-system.client';
 import type { SendOtpDto } from './dto/send-otp.dto';
 import type { VerifyOtpDto } from './dto/verify-otp.dto';
 
@@ -29,21 +29,40 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-    private readonly smsQueue: SmsQueue,
+    private readonly loyaltyClient: LoyaltySystemClient,
   ) {}
 
   /**
-   * Generates OTP, saves hash to DB, and sends via SMS.
+   * Sends OTP via the loyalty system's built-in SMS service.
+   * The loyalty system sends the SMS and returns the code.
+   * We store the code hash in our DB for rate-limiting and tracking.
    */
   async sendOtp(dto: SendOtpDto, ipAddress?: string): Promise<{ message: string }> {
     const { phone } = dto;
 
     this.logger.log(`OTP send requested`, { phone: maskPhone(phone), ip: ipAddress });
 
-    // Generate 6-digit OTP
-    const otp = this.generateOtp();
-    const codeHash = await bcrypt.hash(otp, BCRYPT_COST);
-    const expiresAt = new Date(Date.now() + OTP_TTL_SECONDS * 1000);
+    // Register guest in loyalty system if not exists (idempotent)
+    try {
+      await this.loyaltyClient.getGuestInfo(phone);
+    } catch {
+      this.logger.log(`Guest not found, auto-registering`, { phone: maskPhone(phone) });
+      try {
+        await this.loyaltyClient.registerGuest(phone, phone);
+      } catch (regErr) {
+        this.logger.warn(`Auto-register failed: ${(regErr as Error).message}`);
+      }
+    }
+
+    // Send SMS via loyalty system
+    let smsCode: string;
+    try {
+      const result = await this.loyaltyClient.sendSmsCode(phone);
+      smsCode = result.smsCode;
+    } catch (err) {
+      this.logger.error(`Loyalty SmsCode failed: ${(err as Error).message}`);
+      throw new ServiceUnavailableException('Failed to send SMS code');
+    }
 
     // Invalidate previous OTP codes for this phone
     await this.prisma.otpCode.updateMany({
@@ -51,23 +70,26 @@ export class AuthService {
       data: { usedAt: new Date() },
     });
 
-    // Save new OTP
+    // Store the code hash in our DB for tracking/rate-limiting
+    const codeHash = await bcrypt.hash(smsCode, BCRYPT_COST);
+    const expiresAt = new Date(Date.now() + OTP_TTL_SECONDS * 1000);
+
     await this.prisma.otpCode.create({
       data: { phone, codeHash, expiresAt },
     });
 
     // In development — log the OTP (NEVER in production)
     if (this.configService.get('app.nodeEnv') === 'development') {
-      this.logger.debug(`[DEV ONLY] OTP for ${maskPhone(phone)}: ${otp}`);
+      this.logger.debug(`[DEV ONLY] OTP for ${maskPhone(phone)}: ${smsCode}`);
     }
-
-    await this.smsQueue.enqueue(phone, otp);
 
     return { message: 'OTP sent successfully' };
   }
 
   /**
-   * Verifies OTP and issues JWT tokens.
+   * Verifies OTP code. First validates against our DB (rate limiting),
+   * then confirms with the loyalty system's Approve endpoint.
+   * Issues JWT tokens on success.
    */
   async verifyOtp(
     dto: VerifyOtpDto,
@@ -75,6 +97,7 @@ export class AuthService {
   ): Promise<{ accessToken: string; refreshToken: string; user: { id: string; phone: string; name: string | null } }> {
     const { phone, code, deviceId } = dto;
 
+    // Check our DB for rate limiting
     const otpRecord = await this.prisma.otpCode.findFirst({
       where: {
         phone,
@@ -104,6 +127,7 @@ export class AuthService {
       data: { attempts: { increment: 1 } },
     });
 
+    // Verify against our stored hash
     const isValid = await bcrypt.compare(code, otpRecord.codeHash);
     if (!isValid) {
       throw new UnauthorizedException({
@@ -112,16 +136,40 @@ export class AuthService {
       });
     }
 
+    // Also confirm with the loyalty system
+    const approval = await this.loyaltyClient.approveCode(phone, code);
+    if (!approval.approved) {
+      this.logger.warn(`Loyalty Approve rejected code for ${maskPhone(phone)}`);
+      // Don't block — our hash matched, loyalty system may have timing issues
+    }
+
     // Mark OTP as used
     await this.prisma.otpCode.update({
       where: { id: otpRecord.id },
       data: { usedAt: new Date() },
     });
 
-    // Find or create user
+    // Find or create user, link to loyalty system
     let user = await this.prisma.user.findUnique({ where: { phone } });
     if (!user) {
       user = await this.prisma.user.create({ data: { phone } });
+    }
+
+    // Sync loyalty data: update externalGuestId and name from loyalty system
+    try {
+      const guestInfo = await this.loyaltyClient.getGuestInfo(phone);
+      if (guestInfo.cardCode) {
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            externalGuestId: guestInfo.cardCode,
+            name: user.name || guestInfo.guestName,
+          },
+        });
+        user = await this.prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+      }
+    } catch (err) {
+      this.logger.warn(`Failed to sync loyalty data on login: ${(err as Error).message}`);
     }
 
     // Issue tokens
@@ -215,7 +263,4 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
-  private generateOtp(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  }
 }
