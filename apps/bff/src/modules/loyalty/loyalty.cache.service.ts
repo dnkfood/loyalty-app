@@ -4,10 +4,10 @@ import {
   ServiceUnavailableException,
   Inject,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { Redis } from 'ioredis';
 import type { LoyaltyCache } from '@loyalty/shared-types';
+import { LoyaltySystemClient } from './loyalty-system.client';
 
 const CACHE_TTL = 300; // 5 minutes
 const CACHE_KEY = (guestId: string) => `loyalty:${guestId}`;
@@ -21,13 +21,13 @@ export class LoyaltyCacheService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
-    private readonly configService: ConfigService,
+    private readonly loyaltyClient: LoyaltySystemClient,
   ) {}
 
   /**
    * Retrieves loyalty data using cache-first strategy.
    * 1. Try Redis cache
-   * 2. On miss — fetch from loyalty system
+   * 2. On miss — fetch from real loyalty system XML API
    * 3. On system unavailable — fall back to PostgreSQL loyalty_cache
    */
   async getBalance(guestId: string): Promise<LoyaltyCacheDto> {
@@ -37,15 +37,28 @@ export class LoyaltyCacheService {
       return { ...(JSON.parse(cached) as LoyaltyCacheDto), isCached: true };
     }
 
-    // Cache miss — fetch from loyalty system
+    // Cache miss — fetch from loyalty system XML API
     try {
-      const data = await this.fetchFromLoyaltySystem(guestId);
-      await this.redis.setex(CACHE_KEY(guestId), CACHE_TTL, JSON.stringify(data));
+      const guest = await this.loyaltyClient.getGuestInfo(guestId);
+      const now = new Date();
 
-      // Also update PostgreSQL cache
+      const data: LoyaltyCacheDto = {
+        userId: guestId,
+        externalGuestId: guestId,
+        balance: guest.balance,
+        statusLevel: guest.statusLevel,
+        statusName: guest.statusName,
+        nextLevelPoints: guest.nextLevelPoints,
+        segmentIds: [],
+        isCached: false,
+        cachedAt: now,
+        updatedAt: now,
+      };
+
+      await this.redis.setex(CACHE_KEY(guestId), CACHE_TTL, JSON.stringify(data));
       await this.upsertDbCache(guestId, data);
 
-      return { ...data, isCached: false };
+      return data;
     } catch (err) {
       this.logger.warn(
         `Loyalty system unavailable for guest ${guestId}, falling back to DB cache: ${(err as Error).message}`,
@@ -81,25 +94,6 @@ export class LoyaltyCacheService {
   async invalidateCache(guestId: string): Promise<void> {
     await this.redis.del(CACHE_KEY(guestId));
     this.logger.log(`Cache invalidated for guest ${guestId}`);
-  }
-
-  private async fetchFromLoyaltySystem(guestId: string): Promise<LoyaltyCacheDto> {
-    const loyaltyApiUrl = this.configService.get<string>('app.loyaltySystem.apiUrl');
-    const loyaltyApiKey = this.configService.get<string>('app.loyaltySystem.apiKey');
-
-    // TODO: Use actual HTTP client (Axios) for real loyalty system
-    const response = await fetch(`${loyaltyApiUrl}/guests/${guestId}`, {
-      headers: {
-        Authorization: `Bearer ${loyaltyApiKey}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Loyalty system responded with ${response.status}`);
-    }
-
-    return response.json() as Promise<LoyaltyCacheDto>;
   }
 
   private async upsertDbCache(guestId: string, data: LoyaltyCacheDto): Promise<void> {
