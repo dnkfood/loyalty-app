@@ -12,6 +12,7 @@ interface AuthState {
   accessToken: string | null;
   user: AuthUser | null;
   isAuthenticated: boolean;
+  _hasHydrated: boolean;
   setAuth: (accessToken: string, user: AuthUser) => void;
   logout: () => void;
 }
@@ -22,6 +23,7 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       user: null,
       isAuthenticated: false,
+      _hasHydrated: false,
 
       setAuth: (accessToken, user) =>
         set({ accessToken, user, isAuthenticated: true }),
@@ -40,3 +42,11 @@ export const useAuthStore = create<AuthState>()(
     },
   ),
 );
+
+// Track hydration — must be AFTER store creation to avoid TDZ
+if (useAuthStore.persist.hasHydrated()) {
+  useAuthStore.setState({ _hasHydrated: true });
+}
+useAuthStore.persist.onFinishHydration(() => {
+  useAuthStore.setState({ _hasHydrated: true });
+});

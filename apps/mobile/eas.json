@@ -25,6 +25,9 @@
     "preview": {
       "extends": "base",
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_BFF_URL": "https://loyalty-bff.yourdomain.com/api/v1"
+      },
       "android": {
         "buildType": "apk"
       }

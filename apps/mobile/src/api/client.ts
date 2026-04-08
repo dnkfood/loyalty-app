@@ -3,12 +3,12 @@ import * as SecureStore from 'expo-secure-store';
 import { useAuthStore } from '../stores/auth.store';
 
 const BASE_URL =
-  (process.env.EXPO_PUBLIC_BFF_URL as string | undefined) ?? 'http://localhost:3000/api/v1';
+  (process.env.EXPO_PUBLIC_BFF_URL as string | undefined) ?? 'https://loyalty-bff.yourdomain.com/api/v1';
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 10_000,
+  timeout: 15_000,
 });
 
 let isRefreshing = false;

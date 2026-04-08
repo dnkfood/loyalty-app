@@ -1,8 +1,9 @@
-import { ScrollView, StyleSheet, RefreshControl, View, Text } from 'react-native';
+import { ScrollView, StyleSheet, RefreshControl, View, Text, TouchableOpacity } from 'react-native';
 import { BalanceCard } from '../../src/components/loyalty/BalanceCard';
 import { useBalance } from '../../src/hooks/useBalance';
+import { ErrorBoundary } from '../../src/components/ErrorBoundary';
 
-export default function HomeScreen() {
+function HomeContent() {
   const { data, isLoading, isError, refetch, isRefetching } = useBalance();
 
   return (
@@ -22,6 +23,9 @@ export default function HomeScreen() {
         {isError && (
           <View style={styles.error}>
             <Text style={styles.errorText}>Не удалось загрузить данные</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={() => void refetch()}>
+              <Text style={styles.retryText}>Повторить</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -36,6 +40,14 @@ export default function HomeScreen() {
         )}
       </View>
     </ScrollView>
+  );
+}
+
+export default function HomeScreen() {
+  return (
+    <ErrorBoundary>
+      <HomeContent />
+    </ErrorBoundary>
   );
 }
 
@@ -66,5 +78,17 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#856404',
     textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 12,
+    alignSelf: 'center',
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  retryText: {
+    color: '#fff',
+    fontWeight: '600',
   },
 });
