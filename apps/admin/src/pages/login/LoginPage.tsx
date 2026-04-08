@@ -1,8 +1,8 @@
 import { Form, Input, Button, Card, message } from 'antd';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { apiClient } from '../../api/client';
 import { useAuthStore } from '../../stores/auth.store';
-import type { ApiSuccessResponse } from '@loyalty/shared-types';
 
 interface LoginFormValues {
   email: string;
@@ -10,12 +10,15 @@ interface LoginFormValues {
 }
 
 interface LoginResponse {
-  accessToken: string;
-  user: {
-    id: string;
-    email: string;
-    name: string;
-    role: string;
+  success: boolean;
+  data: {
+    accessToken: string;
+    user: {
+      id: string;
+      email: string;
+      name: string;
+      role: string;
+    };
   };
 }
 
@@ -26,14 +29,19 @@ export function LoginPage() {
 
   const handleSubmit = async (values: LoginFormValues) => {
     try {
-      const { data } = await apiClient.post<ApiSuccessResponse<LoginResponse>>(
+      const { data } = await apiClient.post<LoginResponse>(
         '/admin/auth/login',
         values,
       );
       setAuth(data.data.accessToken, data.data.user);
       void navigate('/dashboard');
-    } catch {
-      void message.error('Неверный email или пароль');
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        void message.error('Неверный email или пароль');
+      } else {
+        console.error('Login error:', err);
+        void message.error('Ошибка соединения с сервером');
+      }
     }
   };
 

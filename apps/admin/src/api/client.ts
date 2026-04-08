@@ -1,7 +1,7 @@
 import axios, { type AxiosInstance } from 'axios';
 import { useAuthStore } from '../stores/auth.store';
 
-const BASE_URL = import.meta.env.VITE_BFF_URL as string ?? 'http://localhost:3000/api/v1';
+const BASE_URL = import.meta.env.VITE_BFF_URL as string ?? 'http://localhost:3100/api/v1';
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,

@@ -10,6 +10,8 @@ import { OffersModule } from './modules/offers/offers.module';
 import { PromotionsModule } from './modules/promotions/promotions.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { InboxModule } from './modules/notifications/inbox/inbox.module';
+import { DevicesModule } from './modules/devices/devices.module';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 import redisConfig from './config/redis.config';
@@ -38,6 +40,8 @@ import jwtConfig from './config/jwt.config';
     PromotionsModule,
     WebhooksModule,
     AdminModule,
+    InboxModule,
+    DevicesModule,
   ],
 })
 export class AppModule {}

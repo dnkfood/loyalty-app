@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { PushQueue } from '../../notifications/push/push.queue';
 import { IsString, IsArray, IsOptional, IsDateString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -27,7 +28,10 @@ export class CreateCampaignDto {
 export class CampaignsService {
   private readonly logger = new Logger(CampaignsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pushQueue: PushQueue,
+  ) {}
 
   /**
    * Creates a new push notification campaign.
@@ -80,9 +84,42 @@ export class CampaignsService {
       data: { status: 'running', startedAt: new Date() },
     });
 
-    // TODO: Enqueue push notifications for target segments
-    this.logger.log(`Campaign ${campaignId} launched`);
+    // Find target users based on campaign segments
+    let userIds: string[];
 
-    return { launched: true, campaignId };
+    if (campaign.segmentIds.length > 0) {
+      const targets = await this.prisma.loyaltyCache.findMany({
+        where: { segmentIds: { hasSome: campaign.segmentIds } },
+        select: { userId: true },
+      });
+      userIds = targets.map((t) => t.userId);
+    } else {
+      // No segments specified — target all users with active push tokens
+      const tokens = await this.prisma.pushToken.findMany({
+        where: { isActive: true },
+        select: { userId: true },
+        distinct: ['userId'],
+      });
+      userIds = tokens.map((t) => t.userId);
+    }
+
+    // Enqueue campaign push for each target user
+    for (const userId of userIds) {
+      await this.pushQueue.enqueueCampaignPush({
+        userId,
+        title: campaign.title,
+        body: campaign.body,
+        campaignId: campaign.id,
+      });
+    }
+
+    await this.prisma.campaign.update({
+      where: { id: campaignId },
+      data: { sentCount: userIds.length },
+    });
+
+    this.logger.log(`Campaign ${campaignId} launched, enqueued ${userIds.length} push notifications`);
+
+    return { launched: true, campaignId, enqueuedCount: userIds.length };
   }
 }

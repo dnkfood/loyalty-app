@@ -13,6 +13,7 @@ import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { maskPhone } from '@loyalty/shared-utils';
 import { ErrorCodes } from '@loyalty/shared-types';
+import { SmsQueue } from '../notifications/sms/sms.queue';
 import type { SendOtpDto } from './dto/send-otp.dto';
 import type { VerifyOtpDto } from './dto/verify-otp.dto';
 
@@ -28,6 +29,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly smsQueue: SmsQueue,
   ) {}
 
   /**
@@ -59,8 +61,7 @@ export class AuthService {
       this.logger.debug(`[DEV ONLY] OTP for ${maskPhone(phone)}: ${otp}`);
     }
 
-    // TODO: Call SmsService to send OTP
-    // await this.smsService.sendOtp(phone, otp);
+    await this.smsQueue.enqueue(phone, otp);
 
     return { message: 'OTP sent successfully' };
   }

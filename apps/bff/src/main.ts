@@ -2,18 +2,20 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import { WinstonModule } from 'nest-winston';
 import { json, urlencoded } from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { winstonConfig } from './common/logger/winston.config';
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
 
   const app = await NestFactory.create(AppModule, {
     rawBody: true,
-    logger: ['log', 'warn', 'error', 'debug'],
+    logger: WinstonModule.createLogger(winstonConfig),
   });
 
   const configService = app.get(ConfigService);

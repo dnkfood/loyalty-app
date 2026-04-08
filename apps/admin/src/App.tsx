@@ -5,12 +5,16 @@ import { LoginPage } from './pages/login/LoginPage';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { UsersPage } from './pages/users/UsersPage';
 import { CampaignsPage } from './pages/campaigns/CampaignsPage';
+import { SmsLogsPage } from './pages/sms-logs/SmsLogsPage';
+import { AuditLogPage } from './pages/audit/AuditLogPage';
+import { StaffPage } from './pages/staff/StaffPage';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
+  const hasHydrated = useAuthStore((s) => s._hasHydrated);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
+
+  if (!hasHydrated) return null;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
 
@@ -31,6 +35,9 @@ export default function App() {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="users" element={<UsersPage />} />
           <Route path="campaigns" element={<CampaignsPage />} />
+          <Route path="sms-logs" element={<SmsLogsPage />} />
+          <Route path="audit" element={<AuditLogPage />} />
+          <Route path="staff" element={<StaffPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

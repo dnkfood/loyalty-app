@@ -1,5 +1,15 @@
-import { useState } from 'react';
-import { ProTable, type ProColumns, type RequestData } from '@ant-design/pro-components';
+import { useRef, useState } from 'react';
+import {
+  ProTable,
+  ProForm,
+  ProFormText,
+  ProFormTextArea,
+  ProFormSelect,
+  ProFormDateTimePicker,
+  type ProColumns,
+  type RequestData,
+  type ActionType,
+} from '@ant-design/pro-components';
 import { Button, Tag, Space, message, Modal } from 'antd';
 import { PlusOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import { apiClient } from '../../api/client';
@@ -37,8 +47,18 @@ const statusLabels: Record<string, string> = {
   failed: 'Ошибка',
 };
 
+interface CampaignFormValues {
+  title: string;
+  body: string;
+  segmentIds?: string[];
+  scheduledAt?: string;
+}
+
 export function CampaignsPage() {
+  const actionRef = useRef<ActionType>();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const fetchCampaigns = async (
     params: { pageSize?: number; current?: number },
@@ -72,6 +92,21 @@ export function CampaignsPage() {
         }
       },
     });
+  };
+
+  const handleCreateCampaign = async (values: CampaignFormValues) => {
+    setSubmitting(true);
+    try {
+      await apiClient.post('/admin/campaigns', values);
+      void message.success('Кампания создана');
+      setCreateModalOpen(false);
+      setRefreshKey((k) => k + 1);
+      actionRef.current?.reload();
+    } catch {
+      void message.error('Не удалось создать кампанию');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const columns: ProColumns<Campaign>[] = [
@@ -122,20 +157,66 @@ export function CampaignsPage() {
   ];
 
   return (
-    <ProTable<Campaign>
-      key={refreshKey}
-      headerTitle="Push-кампании"
-      rowKey="id"
-      columns={columns}
-      request={fetchCampaigns}
-      pagination={{ pageSize: 20 }}
-      search={false}
-      dateFormatter="string"
-      toolBarRender={() => [
-        <Button key="create" type="primary" icon={<PlusOutlined />}>
-          Создать кампанию
-        </Button>,
-      ]}
-    />
+    <>
+      <ProTable<Campaign>
+        key={refreshKey}
+        headerTitle="Push-кампании"
+        rowKey="id"
+        actionRef={actionRef}
+        columns={columns}
+        request={fetchCampaigns}
+        pagination={{ pageSize: 20 }}
+        search={false}
+        dateFormatter="string"
+        toolBarRender={() => [
+          <Button
+            key="create"
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setCreateModalOpen(true)}
+          >
+            Создать кампанию
+          </Button>,
+        ]}
+      />
+
+      <Modal
+        title="Создать кампанию"
+        open={createModalOpen}
+        onCancel={() => setCreateModalOpen(false)}
+        footer={null}
+        destroyOnClose
+      >
+        <ProForm<CampaignFormValues>
+          onFinish={handleCreateCampaign}
+          submitter={{
+            submitButtonProps: { loading: submitting },
+            resetButtonProps: false,
+          }}
+        >
+          <ProFormText
+            name="title"
+            label="Название"
+            rules={[{ required: true, message: 'Введите название' }]}
+          />
+          <ProFormTextArea
+            name="body"
+            label="Текст"
+            rules={[{ required: true, message: 'Введите текст' }]}
+          />
+          <ProFormSelect
+            name="segmentIds"
+            label="Сегменты"
+            mode="tags"
+            placeholder="Введите ID сегментов"
+          />
+          <ProFormDateTimePicker
+            name="scheduledAt"
+            label="Запланировать на"
+            fieldProps={{ style: { width: '100%' } }}
+          />
+        </ProForm>
+      </Modal>
+    </>
   );
 }

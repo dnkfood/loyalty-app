@@ -96,15 +96,98 @@ export class PushService {
     }
   }
 
+  /**
+   * Sends a raw push notification (no template) to all active devices of a user.
+   * Used for campaign pushes where title/body come directly from the campaign.
+   */
+  async sendRawToUser(
+    userId: string,
+    title: string,
+    body: string,
+    data?: Record<string, string>,
+    campaignId?: string,
+  ): Promise<void> {
+    if (!(await this.canSendPush(userId))) {
+      this.logger.warn(`Push frequency cap reached for user ${userId}`);
+      return;
+    }
+    const tokens = await this.prisma.pushToken.findMany({ where: { userId, isActive: true } });
+    if (tokens.length === 0) return;
+
+    for (const token of tokens) {
+      try {
+        await this.sendToDevice(token.token, token.platform, { title, body }, data);
+        await this.prisma.pushNotificationLog.create({
+          data: { campaignId, userId, token: token.token, status: 'sent' },
+        });
+        await this.incrementPushCount(userId);
+      } catch (err) {
+        await this.prisma.pushNotificationLog.create({
+          data: { campaignId, userId, token: token.token, status: 'failed', errorCode: (err as Error).message },
+        });
+      }
+    }
+  }
+
   private async sendToDevice(
     token: string,
     platform: string,
     notification: { title: string; body: string },
     data?: Record<string, string>,
   ): Promise<void> {
-    // TODO: Implement FCM (Android) and APNs (iOS) sending
-    this.logger.debug(`Sending push to ${platform} device, token: ${token.slice(0, 10)}...`);
-    void data;
-    void notification;
+    if (platform === 'android') {
+      await this.sendFcm(token, notification, data);
+    } else if (platform === 'ios') {
+      await this.sendApns(token, notification, data);
+    } else {
+      this.logger.warn(`Unknown platform: ${platform}`);
+    }
+  }
+
+  private async sendFcm(
+    token: string,
+    notification: { title: string; body: string },
+    data?: Record<string, string>,
+  ): Promise<void> {
+    const serverKey = this.configService.get<string>('app.push.fcm.serverKey', '');
+    if (!serverKey) {
+      this.logger.warn('FCM_SERVER_KEY not configured, skipping push send');
+      return;
+    }
+
+    const response = await fetch('https://fcm.googleapis.com/fcm/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `key=${serverKey}`,
+      },
+      body: JSON.stringify({
+        to: token,
+        notification: { title: notification.title, body: notification.body },
+        data: data ?? {},
+      }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`FCM error ${response.status}: ${text}`);
+    }
+  }
+
+  private async sendApns(
+    _token: string,
+    _notification: { title: string; body: string },
+    _data?: Record<string, string>,
+  ): Promise<void> {
+    const bundleId = this.configService.get<string>('app.push.apns.bundleId', '');
+    const keyId = this.configService.get<string>('app.push.apns.keyId', '');
+    if (!bundleId || !keyId) {
+      this.logger.warn('APNs not configured, skipping push send');
+      return;
+    }
+
+    // APNs HTTP/2 implementation requires p8 key file and JWT signing
+    // For now, log and skip if key file doesn't exist
+    this.logger.warn('APNs HTTP/2 sending not yet fully implemented, skipping');
   }
 }

@@ -1,0 +1,2 @@
+Everything looks good. Open http://localhost:5173 in the browser and test the login with admin@loyalty.local / xKyCs2HuPzJ8Fnhz.
+

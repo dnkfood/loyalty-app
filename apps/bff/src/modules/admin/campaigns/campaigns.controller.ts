@@ -11,16 +11,16 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CampaignsService, CreateCampaignDto } from './campaigns.service';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { JwtStaffAuthGuard } from '../../auth/guards/jwt-staff-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { StaffRole } from '@loyalty/shared-types';
-import type { JwtPayload } from '../../auth/strategies/jwt.strategy';
+import type { JwtStaffPayload } from '../../auth/strategies/jwt-staff.strategy';
 
 @ApiTags('admin')
 @Controller('admin/campaigns')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtStaffAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class CampaignsController {
   constructor(private readonly campaignsService: CampaignsService) {}
@@ -30,7 +30,7 @@ export class CampaignsController {
   @ApiOperation({ summary: 'Create a push notification campaign' })
   async createCampaign(
     @Body() dto: CreateCampaignDto,
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: JwtStaffPayload,
   ) {
     return this.campaignsService.createCampaign(dto, user.sub);
   }

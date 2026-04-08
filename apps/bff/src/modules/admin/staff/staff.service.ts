@@ -44,6 +44,31 @@ export class StaffService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
+   * Lists staff users with pagination.
+   */
+  async listStaff(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const [items, total] = await Promise.all([
+      this.prisma.staffUser.findMany({
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          isActive: true,
+          lastLoginAt: true,
+          createdAt: true,
+        },
+      }),
+      this.prisma.staffUser.count(),
+    ]);
+    return { items, total, page, limit };
+  }
+
+  /**
    * Creates a new staff user.
    */
   async createStaff(dto: CreateStaffDto) {

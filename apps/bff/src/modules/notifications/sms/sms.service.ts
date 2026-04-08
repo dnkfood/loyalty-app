@@ -2,6 +2,7 @@ import { Injectable, Logger, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { SmsGateway, SmsResult } from './providers/sms-gateway.interface';
 import { maskPhone } from '@loyalty/shared-utils';
+import { PrismaService } from '../../../prisma/prisma.service';
 
 const SMS_TIMEOUT_MS = 5000;
 
@@ -13,6 +14,7 @@ export class SmsService {
     @Inject('BEELINE_SMS') private readonly beeline: SmsGateway,
     @Inject('ALFA_SMS') private readonly alfa: SmsGateway,
     private readonly configService: ConfigService,
+    private readonly prisma: PrismaService,
   ) {}
 
   /**
@@ -38,9 +40,11 @@ export class SmsService {
           provider: primaryName,
           messageId: result.messageId,
         });
+        await this.logSms(phone, primaryName, result.messageId ?? null, 'delivered', null);
         return result;
       }
 
+      await this.logSms(phone, primaryName, null, 'failed', result.error ?? 'unknown');
       throw new Error(`Primary SMS provider returned failure: ${result.error ?? 'unknown'}`);
     } catch (err) {
       this.logger.warn(
@@ -56,15 +60,33 @@ export class SmsService {
           provider: fallbackName,
           messageId: fallbackResult.messageId,
         });
+        await this.logSms(phone, fallbackName, fallbackResult.messageId ?? null, 'delivered', null);
       } else {
         this.logger.error('Both SMS providers failed', {
           phone: maskPhone(phone),
           primaryError: (err as Error).message,
           fallbackError: fallbackResult.error,
         });
+        await this.logSms(phone, fallbackName, null, 'failed', fallbackResult.error ?? 'unknown');
       }
 
       return fallbackResult;
+    }
+  }
+
+  private async logSms(
+    phone: string,
+    provider: string,
+    messageId: string | null,
+    status: string,
+    error: string | null,
+  ): Promise<void> {
+    try {
+      await this.prisma.smsLog.create({
+        data: { phone, provider, messageId, status, error },
+      });
+    } catch (err) {
+      this.logger.warn(`Failed to log SMS entry: ${(err as Error).message}`);
     }
   }
 }

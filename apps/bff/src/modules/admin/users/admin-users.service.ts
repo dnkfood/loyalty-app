@@ -87,4 +87,65 @@ export class AdminUsersService {
     this.logger.log(`Admin viewed user ${userId}`);
     return { ...user, phone: maskPhone(user.phone) };
   }
+
+  /**
+   * Gets the loyalty balance for a user.
+   */
+  async getUserBalance(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, externalGuestId: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const cache = await this.prisma.loyaltyCache.findUnique({
+      where: { userId },
+    });
+
+    return {
+      userId,
+      balance: cache?.balance ?? 0,
+      statusLevel: cache?.statusLevel ?? null,
+      statusName: cache?.statusName ?? null,
+      nextLevelPoints: cache?.nextLevelPoints ?? null,
+      cachedAt: cache?.cachedAt ?? null,
+    };
+  }
+
+  /**
+   * Gets transaction history for a user with pagination.
+   */
+  async getUserTransactions(userId: string, page: number, limit: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, externalGuestId: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (!user.externalGuestId) {
+      return { items: [], total: 0, page, limit };
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [transactions, total] = await Promise.all([
+      this.prisma.transactionLog.findMany({
+        where: { externalGuestId: user.externalGuestId },
+        skip,
+        take: limit,
+        orderBy: { occurredAt: 'desc' },
+      }),
+      this.prisma.transactionLog.count({
+        where: { externalGuestId: user.externalGuestId },
+      }),
+    ]);
+
+    return { items: transactions, total, page, limit };
+  }
 }

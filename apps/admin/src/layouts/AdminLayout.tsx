@@ -6,6 +6,9 @@ import {
   UserOutlined,
   NotificationOutlined,
   LogoutOutlined,
+  MessageOutlined,
+  AuditOutlined,
+  TeamOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../stores/auth.store';
 
@@ -24,6 +27,21 @@ const menuItems: MenuDataItem[] = [
     path: '/campaigns',
     name: 'Push-кампании',
     icon: <NotificationOutlined />,
+  },
+  {
+    path: '/sms-logs',
+    name: 'SMS логи',
+    icon: <MessageOutlined />,
+  },
+  {
+    path: '/audit',
+    name: 'Журнал действий',
+    icon: <AuditOutlined />,
+  },
+  {
+    path: '/staff',
+    name: 'Сотрудники',
+    icon: <TeamOutlined />,
   },
 ];
 

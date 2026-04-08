@@ -26,6 +26,7 @@ model User {
 
   sessions         AuthSession[]
   pushTokens       PushToken[]
+  notifications    InAppNotification[]
 
   @@map("users")
 }
@@ -180,4 +181,34 @@ model AuditLog {
   @@index([staffUserId])
   @@index([createdAt])
   @@map("audit_log")
+}
+
+model SmsLog {
+  id        String   @id @default(uuid())
+  phone     String
+  provider  String   // beeline | alfa
+  messageId String?  @map("message_id")
+  status    String   @default("pending") // pending | delivered | failed
+  error     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([phone])
+  @@index([createdAt])
+  @@map("sms_log")
+}
+
+model InAppNotification {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  title     String
+  body      String
+  data      Json?
+  isRead    Boolean   @default(false) @map("is_read")
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("in_app_notifications")
 }
