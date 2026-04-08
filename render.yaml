@@ -9,7 +9,7 @@ services:
       pnpm install --frozen-lockfile --ignore-scripts &&
       pnpm --filter @loyalty/shared-types build &&
       pnpm --filter @loyalty/shared-utils build &&
-      pnpm --filter bff exec prisma generate --schema=apps/bff/prisma/schema.prisma &&
+      pnpm --filter bff exec prisma generate --schema=prisma/schema.prisma &&
       pnpm --filter bff build
     startCommand: |
       cd apps/bff && npx prisma migrate deploy && node dist/main.js
