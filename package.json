@@ -23,6 +23,13 @@
     "prettier": "^3.2.5",
     "@types/node": "^20.12.7"
   },
+  "pnpm": {
+    "overrides": {
+      "react": "18.2.0",
+      "react-dom": "18.2.0",
+      "@types/react": "~18.2.79"
+    }
+  },
   "engines": {
     "node": ">=20.0.0",
     "pnpm": ">=9.0.0"
