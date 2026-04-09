@@ -83,6 +83,14 @@ export interface LoyaltyBalanceResponse {
   statusLevel: string;
   statusName: string;
   nextLevelPoints?: number | null;
+  bonusPercent: number;
+  cardCode: string;
+  guestName: string | null;
+  /**
+   * Accumulated spend toward the next status level (loyalty `summa_a` field).
+   * Falls back to `balance` if the loyalty system doesn't expose it.
+   */
+  currentSpend: number;
   isCached: boolean;
   cachedAt?: Date;
 }

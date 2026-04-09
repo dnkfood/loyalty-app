@@ -39,7 +39,8 @@ function useAuthHydration() {
     let cancelled = false;
     (async () => {
       try {
-        const { useAuthStore } = await import('../src/stores/auth.store');
+        // eslint-disable-next-line @typescript-eslint/consistent-type-imports
+        const { useAuthStore } = require('../src/stores/auth.store') as typeof import('../src/stores/auth.store');
         const check = () => {
           if (!cancelled) {
             setState({ ready: true, authenticated: useAuthStore.getState().isAuthenticated });

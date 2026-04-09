@@ -12,7 +12,19 @@ import { LoyaltySystemClient } from './loyalty-system.client';
 const CACHE_TTL = 300; // 5 minutes
 const CACHE_KEY = (guestId: string) => `loyalty:${guestId}`;
 
-export type LoyaltyCacheDto = LoyaltyCache & { isCached: boolean };
+/**
+ * Cache DTO carries the persistent fields from the `LoyaltyCache` table plus
+ * a few extras populated only on a fresh fetch from the loyalty system. The
+ * extras are stored in the Redis JSON blob but NOT in the PostgreSQL table —
+ * the PG fallback path returns them as null/0, which the upstream service
+ * is responsible for substituting via proxy values.
+ */
+export type LoyaltyCacheDto = LoyaltyCache & {
+  isCached: boolean;
+  bonusPercent: number;
+  guestName: string | null;
+  currentSpend: number | null;
+};
 
 @Injectable()
 export class LoyaltyCacheService {
@@ -50,6 +62,9 @@ export class LoyaltyCacheService {
         statusName: guest.statusLevel,
         nextLevelPoints: guest.nextLevelSumma != null ? Math.round(guest.nextLevelSumma) : null,
         segmentIds: [],
+        bonusPercent: guest.bonusPercent,
+        guestName: guest.guestName,
+        currentSpend: guest.currentSpend,
         isCached: false,
         cachedAt: now,
         updatedAt: now,
@@ -78,6 +93,10 @@ export class LoyaltyCacheService {
           statusName: dbCache.statusName,
           nextLevelPoints: dbCache.nextLevelPoints,
           segmentIds: dbCache.segmentIds,
+          // PG fallback doesn't carry these — service layer fills proxies.
+          bonusPercent: 0,
+          guestName: null,
+          currentSpend: null,
           isCached: true,
           cachedAt: dbCache.cachedAt,
           updatedAt: dbCache.updatedAt,

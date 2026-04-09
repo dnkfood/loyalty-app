@@ -117,7 +117,7 @@ describe('AuthService', () => {
       loyaltyClient.getGuestInfo.mockResolvedValue({
         balance: 200, bonusPercent: 5, maxPercent: 30,
         cardCode: '810885688', guestName: 'Test', nextLevelSumma: 25000,
-        statusLevel: 'FRIEND', cell: phone, levels: [],
+        currentSpend: 12500, statusLevel: 'FRIEND', cell: phone, levels: [],
       });
       jwtService.sign.mockReturnValueOnce('access-token').mockReturnValueOnce('refresh-token');
       configService.get.mockReturnValue('secret');
@@ -177,7 +177,7 @@ describe('AuthService', () => {
       loyaltyClient.getGuestInfo.mockResolvedValue({
         balance: 200, bonusPercent: 5, maxPercent: 30,
         cardCode: '810885688', guestName: null, nextLevelSumma: 25000,
-        statusLevel: 'FRIEND', cell: phone, levels: [],
+        currentSpend: 12500, statusLevel: 'FRIEND', cell: phone, levels: [],
       });
       jwtService.sign.mockReturnValue('token');
       configService.get.mockReturnValue('secret');

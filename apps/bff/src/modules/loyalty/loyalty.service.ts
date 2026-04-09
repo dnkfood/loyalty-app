@@ -21,7 +21,7 @@ export class LoyaltyService {
   async getBalance(userId: string): Promise<LoyaltyBalanceResponse> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { phone: true, externalGuestId: true },
+      select: { phone: true, externalGuestId: true, name: true },
     });
 
     if (!user) {
@@ -31,7 +31,7 @@ export class LoyaltyService {
       });
     }
 
-    // Use phone as loyalty system identifier (XML API uses cell=phone)
+    // Phone is the loyalty system's lookup key (was `cell=` in the legacy XML).
     const lookupId = user.phone;
     const cached = await this.cacheService.getBalance(lookupId);
 
@@ -40,6 +40,13 @@ export class LoyaltyService {
       statusLevel: cached.statusLevel,
       statusName: cached.statusName,
       nextLevelPoints: cached.nextLevelPoints,
+      bonusPercent: cached.bonusPercent,
+      cardCode: cached.externalGuestId,
+      // Prefer the user's stored name; fall back to whatever loyalty had.
+      guestName: user.name ?? cached.guestName,
+      // If the loyalty system didn't expose `summa_a`, use `balance` as a
+      // proxy so the progress bar still has something to render.
+      currentSpend: cached.currentSpend ?? cached.balance,
       isCached: cached.isCached,
       cachedAt: cached.cachedAt,
     };

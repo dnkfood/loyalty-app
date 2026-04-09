@@ -17,6 +17,12 @@ export interface LoyaltyGuestInfoDto {
   cardCode: string;
   guestName: string | null;
   nextLevelSumma: number | null;
+  /**
+   * Accumulated spend toward the next status level (loyalty `summa_a` field).
+   * Null if the loyalty system doesn't include it in the response — caller
+   * should fall back to `balance` as a proxy.
+   */
+  currentSpend: number | null;
   statusLevel: string;
   cell: string;
   levels: LoyaltyLevelDto[];
@@ -53,6 +59,8 @@ interface LoyaltyErrorEnvelope {
 
 interface InfoResponseJson extends LoyaltyErrorEnvelope {
   summa?: number | string;
+  // Accumulated spend toward next level (legacy XML field name).
+  summa_a?: number | string;
   bonus_percent?: number | string;
   max_percent?: number | string;
   card_code?: number | string;
@@ -123,6 +131,8 @@ export class LoyaltySystemClient {
         data.next_level_summa != null
           ? parseFloat(String(data.next_level_summa))
           : null,
+      currentSpend:
+        data.summa_a != null ? parseFloat(String(data.summa_a)) : null,
       statusLevel: data.name_level ?? 'FRIEND',
       cell: String(data.cell ?? normalized),
       levels: this.parseLevels(data.levels),

@@ -61,7 +61,7 @@ describe('LoyaltyCacheService', () => {
       loyaltyClient.getGuestInfo.mockResolvedValue({
         balance: 200, bonusPercent: 5, maxPercent: 30,
         cardCode: '810885688', guestName: 'Test', nextLevelSumma: 24999.99,
-        statusLevel: 'FRIEND', cell: phone, levels: [],
+        currentSpend: 12500, statusLevel: 'FRIEND', cell: phone, levels: [],
       });
       redis.setex.mockResolvedValue('OK');
       prisma.loyaltyCache.upsert.mockResolvedValue({} as any);
@@ -71,6 +71,9 @@ describe('LoyaltyCacheService', () => {
       expect(result.isCached).toBe(false);
       expect(result.balance).toBe(200);
       expect(result.externalGuestId).toBe('810885688');
+      expect(result.bonusPercent).toBe(5);
+      expect(result.guestName).toBe('Test');
+      expect(result.currentSpend).toBe(12500);
       expect(redis.setex).toHaveBeenCalledWith(`loyalty:${phone}`, 300, expect.any(String));
       expect(prisma.loyaltyCache.upsert).toHaveBeenCalled();
     });

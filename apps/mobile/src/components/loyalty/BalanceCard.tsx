@@ -1,81 +1,143 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
+import { ProgressBar } from '../ui/ProgressBar';
 import { formatPoints } from '../../utils/format';
 
 interface BalanceCardProps {
+  guestName: string | null;
   balance: number;
-  statusName: string;
   statusLevel: string;
-  nextLevelPoints?: number;
+  statusName: string;
+  bonusPercent: number;
+  currentSpend: number;
+  nextLevelPoints?: number | null;
   isCached?: boolean;
 }
 
+/**
+ * Color coding by loyalty tier. Falls back to FRIEND blue for unknown
+ * level keys so unknown new tiers don't render as transparent.
+ */
+const LEVEL_COLORS: Record<string, { bg: string; accent: string }> = {
+  FRIEND: { bg: '#0A84FF', accent: '#5AC8FA' },
+  FAMILY: { bg: '#B8860B', accent: '#FFD700' },
+  'BIG LOVE': { bg: '#7B1FA2', accent: '#CE93D8' },
+};
+
+function getLevelColors(level: string) {
+  return LEVEL_COLORS[level] ?? LEVEL_COLORS.FRIEND;
+}
+
 export function BalanceCard({
+  guestName,
   balance,
+  statusLevel,
   statusName,
-  statusLevel: _statusLevel,
+  bonusPercent,
+  currentSpend,
   nextLevelPoints,
   isCached = false,
 }: BalanceCardProps) {
+  const colors = getLevelColors(statusLevel);
+  const hasNextLevel = nextLevelPoints != null && nextLevelPoints > 0;
+  const remaining = hasNextLevel
+    ? Math.max(0, nextLevelPoints - currentSpend)
+    : 0;
+
   return (
-    <Card style={styles.card} padding={24}>
+    <Card style={{ backgroundColor: colors.bg }} padding={24}>
       <View style={styles.header}>
-        <Text style={styles.label}>Баланс баллов</Text>
+        <Text style={styles.greeting}>
+          {guestName ? `Привет, ${guestName}` : 'Привет!'}
+        </Text>
         {isCached && (
-          <Badge label="Кэшировано" color="#856404" backgroundColor="#fff3cd" />
+          <Badge label="Кэш" color="#856404" backgroundColor="#fff3cd" />
         )}
       </View>
 
+      <Text style={styles.label}>Баланс баллов</Text>
       <Text style={styles.balance}>{formatPoints(balance)}</Text>
-      <Text style={styles.balanceLabel}>баллов</Text>
 
       <View style={styles.statusRow}>
-        <Badge label={statusName} color="#fff" backgroundColor="#007AFF" />
+        <Badge
+          label={statusName}
+          color="#fff"
+          backgroundColor={colors.accent}
+        />
+        <Text style={styles.bonusPercent}>Кэшбэк {bonusPercent}%</Text>
       </View>
 
-      {nextLevelPoints !== undefined && nextLevelPoints > 0 && (
-        <Text style={styles.nextLevel}>
-          До следующего уровня: {formatPoints(nextLevelPoints)} баллов
-        </Text>
+      {hasNextLevel && (
+        <View style={styles.progressSection}>
+          <ProgressBar
+            value={currentSpend}
+            max={nextLevelPoints}
+            color="#fff"
+            trackColor="rgba(255,255,255,0.25)"
+          />
+          <View style={styles.progressLabels}>
+            <Text style={styles.progressText}>
+              {formatPoints(currentSpend)} ₽
+            </Text>
+            <Text style={styles.progressText}>
+              до след. уровня: {formatPoints(remaining)} ₽
+            </Text>
+          </View>
+        </View>
       )}
     </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    background: 'linear-gradient(135deg, #007AFF, #00A2FF)',
-    backgroundColor: '#007AFF',
-  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
+  },
+  greeting: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: '600',
+    flex: 1,
   },
   label: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
     fontWeight: '500',
+    marginBottom: 4,
   },
   balance: {
     fontSize: 48,
     fontWeight: 'bold',
     color: '#fff',
     lineHeight: 56,
-  },
-  balanceLabel: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
     marginBottom: 16,
   },
   statusRow: {
     flexDirection: 'row',
-    marginBottom: 12,
+    alignItems: 'center',
+    marginBottom: 20,
+    gap: 12,
   },
-  nextLevel: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.7)',
+  bonusPercent: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: '600',
+  },
+  progressSection: {
+    marginTop: 4,
+  },
+  progressLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  progressText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.85)',
+    fontWeight: '500',
   },
 });

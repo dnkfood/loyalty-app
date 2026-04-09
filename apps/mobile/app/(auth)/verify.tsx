@@ -33,7 +33,7 @@ export default function VerifyScreen() {
       setLoading(true);
       const result = await verifyOtp(phone ?? '', code);
       await saveTokens(result.accessToken, result.refreshToken);
-      setAuth(result.accessToken, result.user);
+      setAuth(result.accessToken, { ...result.user, name: result.user.name ?? null });
       // Navigation handled by root layout auth guard
     } catch {
       Alert.alert('Ошибка', 'Неверный или истёкший код. Попробуйте снова.');
