@@ -24,8 +24,8 @@ export default function VerifyScreen() {
   const setAuth = useAuthStore((s) => s.setAuth);
 
   const handleVerify = async () => {
-    if (code.length !== 6) {
-      Alert.alert('Ошибка', 'Введите 6-значный код');
+    if (code.length < 4) {
+      Alert.alert('Ошибка', 'Введите код из SMS');
       return;
     }
 
@@ -61,7 +61,7 @@ export default function VerifyScreen() {
           onChangeText={setCode}
           placeholder="------"
           keyboardType="number-pad"
-          maxLength={6}
+          maxLength={10}
           autoFocus
           textAlign="center"
         />
@@ -70,7 +70,7 @@ export default function VerifyScreen() {
           title="Подтвердить"
           onPress={() => void handleVerify()}
           loading={loading}
-          disabled={code.length !== 6}
+          disabled={code.length < 4}
         />
 
         <TouchableOpacity style={styles.resendButton}>

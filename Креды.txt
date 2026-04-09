@@ -1,2 +1,6 @@
 Everything looks good. Open http://localhost:5173 in the browser and test the login with admin@loyalty.local / xKyCs2HuPzJ8Fnhz.
 
+
+postgresql://loyalty:yRKyw23bNcjPcH7q4Vug3cntsN6458uc@dpg-d7b0gq0ule4c738ntdd0-a/loyalty_db_dyqg
+redis://red-d7b0ics50q8c73atquhg:6379
+

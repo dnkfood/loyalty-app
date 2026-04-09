@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
+  fallbackRender?: (props: { error: Error; resetError: () => void }) => ReactNode;
 }
 
 interface State {
@@ -18,12 +19,23 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
+  componentDidCatch(error: Error, info: { componentStack?: string }) {
+    console.error('[ErrorBoundary]', error.message, info.componentStack);
+  }
+
   handleReset = () => {
     this.setState({ hasError: false, error: null });
   };
 
   render() {
-    if (this.state.hasError) {
+    if (this.state.hasError && this.state.error) {
+      if (this.props.fallbackRender) {
+        return this.props.fallbackRender({
+          error: this.state.error,
+          resetError: this.handleReset,
+        });
+      }
+
       if (this.props.fallback) {
         return this.props.fallback;
       }
@@ -32,7 +44,7 @@ export class ErrorBoundary extends Component<Props, State> {
         <View style={styles.container}>
           <Text style={styles.title}>Что-то пошло не так</Text>
           <Text style={styles.message}>
-            {this.state.error?.message ?? 'Неизвестная ошибка'}
+            {this.state.error.message}
           </Text>
           <TouchableOpacity style={styles.button} onPress={this.handleReset}>
             <Text style={styles.buttonText}>Попробовать снова</Text>

@@ -17,6 +17,32 @@ interface AuthState {
   logout: () => void;
 }
 
+// Safe storage wrapper — if AsyncStorage throws, fall back to in-memory
+const safeStorage = createJSONStorage(() => ({
+  getItem: async (key: string) => {
+    try {
+      return await AsyncStorage.getItem(key);
+    } catch (err) {
+      console.error('[AuthStore] AsyncStorage.getItem failed:', err);
+      return null;
+    }
+  },
+  setItem: async (key: string, value: string) => {
+    try {
+      await AsyncStorage.setItem(key, value);
+    } catch (err) {
+      console.error('[AuthStore] AsyncStorage.setItem failed:', err);
+    }
+  },
+  removeItem: async (key: string) => {
+    try {
+      await AsyncStorage.removeItem(key);
+    } catch (err) {
+      console.error('[AuthStore] AsyncStorage.removeItem failed:', err);
+    }
+  },
+}));
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
@@ -33,7 +59,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: safeStorage,
       partialize: (state) => ({
         accessToken: state.accessToken,
         user: state.user,
@@ -44,9 +70,15 @@ export const useAuthStore = create<AuthState>()(
 );
 
 // Track hydration — must be AFTER store creation to avoid TDZ
-if (useAuthStore.persist.hasHydrated()) {
+try {
+  if (useAuthStore.persist.hasHydrated()) {
+    useAuthStore.setState({ _hasHydrated: true });
+  }
+  useAuthStore.persist.onFinishHydration(() => {
+    useAuthStore.setState({ _hasHydrated: true });
+  });
+} catch (err) {
+  console.error('[AuthStore] Hydration tracking failed:', err);
+  // Force hydrated so the app doesn't hang on the loading screen
   useAuthStore.setState({ _hasHydrated: true });
 }
-useAuthStore.persist.onFinishHydration(() => {
-  useAuthStore.setState({ _hasHydrated: true });
-});
