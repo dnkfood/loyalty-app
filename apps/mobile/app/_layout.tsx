@@ -1,169 +1,147 @@
-import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { Stack } from 'expo-router';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useEffect, useState, Component, type ReactNode } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { ErrorBoundary } from '../src/components/ErrorBoundary';
 
-// Global unhandled error/rejection handler
-if (typeof ErrorUtils !== 'undefined') {
-  const originalHandler = ErrorUtils.getGlobalHandler();
-  ErrorUtils.setGlobalHandler((error, isFatal) => {
-    console.error('[GlobalError]', isFatal ? 'FATAL' : 'non-fatal', error);
-    if (originalHandler) {
-      originalHandler(error, isFatal);
+// ── Crash-proof ErrorBoundary that renders error to screen ──
+interface EBProps { children: ReactNode }
+interface EBState { error: Error | null }
+
+class CrashGuard extends Component<EBProps, EBState> {
+  state: EBState = { error: null };
+  static getDerivedStateFromError(error: Error): EBState { return { error }; }
+  componentDidCatch(error: Error) { console.error('[CrashGuard]', error); }
+  render() {
+    if (this.state.error) {
+      return (
+        <View style={s.fatal}>
+          <Text style={s.fatalTitle}>Crash Report</Text>
+          <ScrollView style={s.scroll}>
+            <Text style={s.mono}>{this.state.error.message}</Text>
+            <Text style={s.mono}>{this.state.error.stack}</Text>
+          </ScrollView>
+          <TouchableOpacity style={s.btn} onPress={() => this.setState({ error: null })}>
+            <Text style={s.btnTxt}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      );
     }
-  });
+    return this.props.children;
+  }
 }
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,
-      retry: 1,
-    },
-  },
-});
-
-function useAuthStoreHydration(): { hasHydrated: boolean; isAuthenticated: boolean } {
-  const [state, setState] = useState({ hasHydrated: false, isAuthenticated: false });
+// ── Lazy-loaded main app ──
+// Every import is dynamic to catch which module crashes
+function AppLoader() {
+  const [state, setState] = useState<
+    { phase: 'loading' } |
+    { phase: 'ready'; App: React.ComponentType } |
+    { phase: 'error'; message: string; stack?: string }
+  >({ phase: 'loading' });
 
   useEffect(() => {
     let cancelled = false;
 
-    async function init() {
+    async function boot() {
       try {
-        // Dynamic import to catch any module-level errors in auth.store
+        // Phase 1: load QueryClient
+        setState({ phase: 'loading' });
+        const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
+
+        // Phase 2: load auth store
         const { useAuthStore } = await import('../src/stores/auth.store');
 
-        // Wait for hydration
-        if (useAuthStore.persist.hasHydrated()) {
-          if (!cancelled) {
-            const s = useAuthStore.getState();
-            setState({ hasHydrated: true, isAuthenticated: s.isAuthenticated });
+        // Phase 3: wait for hydration
+        await new Promise<void>((resolve) => {
+          if (useAuthStore.persist.hasHydrated()) {
+            resolve();
+            return;
           }
+          const unsub = useAuthStore.persist.onFinishHydration(() => {
+            unsub();
+            resolve();
+          });
+          // Timeout after 3 seconds
+          setTimeout(resolve, 3000);
+        });
+
+        // Phase 4: load expo-router Stack
+        const { Stack } = await import('expo-router');
+
+        // Phase 5: build the app component
+        const queryClient = new QueryClient({
+          defaultOptions: { queries: { staleTime: 30_000, retry: 1 } },
+        });
+
+        function ReadyApp() {
+          const isAuthenticated = useAuthStore((st) => st.isAuthenticated);
+          return (
+            <QueryClientProvider client={queryClient}>
+              <StatusBar style="auto" />
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="(auth)" redirect={isAuthenticated} />
+                <Stack.Screen name="(app)" redirect={!isAuthenticated} />
+              </Stack>
+            </QueryClientProvider>
+          );
         }
 
-        useAuthStore.persist.onFinishHydration(() => {
-          if (!cancelled) {
-            const s = useAuthStore.getState();
-            setState({ hasHydrated: true, isAuthenticated: s.isAuthenticated });
-          }
-        });
-
-        // Also subscribe to auth changes
-        useAuthStore.subscribe((s) => {
-          if (!cancelled) {
-            setState({ hasHydrated: true, isAuthenticated: s.isAuthenticated });
-          }
-        });
-      } catch (err) {
-        console.error('[AuthInit] Failed to initialize auth store:', err);
         if (!cancelled) {
-          // Auth store failed — proceed as unauthenticated
-          setState({ hasHydrated: true, isAuthenticated: false });
+          setState({ phase: 'ready', App: ReadyApp });
+        }
+      } catch (err) {
+        console.error('[Boot]', err);
+        if (!cancelled) {
+          const e = err instanceof Error ? err : new Error(String(err));
+          setState({ phase: 'error', message: e.message, stack: e.stack });
         }
       }
     }
 
-    void init();
+    void boot();
     return () => { cancelled = true; };
   }, []);
 
-  return state;
-}
-
-function RootLayout() {
-  const { hasHydrated, isAuthenticated } = useAuthStoreHydration();
-
-  if (!hasHydrated) {
+  if (state.phase === 'loading') {
     return (
-      <View style={styles.loading}>
+      <View style={s.center}>
         <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={s.loadTxt}>Загрузка...</Text>
       </View>
     );
   }
 
-  return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(auth)" redirect={isAuthenticated} />
-      <Stack.Screen name="(app)" redirect={!isAuthenticated} />
-    </Stack>
-  );
+  if (state.phase === 'error') {
+    return (
+      <View style={s.fatal}>
+        <Text style={s.fatalTitle}>Boot Error</Text>
+        <ScrollView style={s.scroll}>
+          <Text style={s.mono}>{state.message}</Text>
+          <Text style={s.mono}>{state.stack}</Text>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  const { App } = state;
+  return <App />;
 }
 
-function FatalErrorScreen({ error, onRetry }: { error: Error; onRetry: () => void }) {
-  return (
-    <View style={styles.fatal}>
-      <Text style={styles.fatalTitle}>Loyalty App</Text>
-      <Text style={styles.fatalMessage}>
-        Не удалось запустить приложение
-      </Text>
-      <Text style={styles.fatalDetail}>{error.message}</Text>
-      <TouchableOpacity style={styles.fatalButton} onPress={onRetry}>
-        <Text style={styles.fatalButtonText}>Попробовать снова</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
+// ── Root export — absolutely minimal, wraps everything in CrashGuard ──
 export default function Layout() {
   return (
-    <ErrorBoundary
-      fallbackRender={({ error, resetError }) => (
-        <FatalErrorScreen error={error} onRetry={resetError} />
-      )}
-    >
-      <QueryClientProvider client={queryClient}>
-        <StatusBar style="auto" />
-        <RootLayout />
-      </QueryClientProvider>
-    </ErrorBoundary>
+    <CrashGuard>
+      <AppLoader />
+    </CrashGuard>
   );
 }
 
-const styles = StyleSheet.create({
-  loading: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-  },
-  fatal: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-    backgroundColor: '#fff',
-  },
-  fatalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 16,
-  },
-  fatalMessage: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  fatalDetail: {
-    fontSize: 12,
-    color: '#999',
-    textAlign: 'center',
-    marginBottom: 24,
-    fontFamily: 'monospace',
-  },
-  fatalButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 12,
-  },
-  fatalButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+const s = StyleSheet.create({
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' },
+  loadTxt: { marginTop: 12, color: '#666', fontSize: 16 },
+  fatal: { flex: 1, backgroundColor: '#1a1a1a', padding: 20, paddingTop: 60 },
+  fatalTitle: { color: '#ff4444', fontSize: 20, fontWeight: 'bold', marginBottom: 12 },
+  scroll: { flex: 1 },
+  mono: { color: '#eee', fontSize: 12, fontFamily: 'monospace', marginBottom: 8 },
+  btn: { backgroundColor: '#007AFF', padding: 14, borderRadius: 8, alignItems: 'center', marginTop: 12 },
+  btnTxt: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });
