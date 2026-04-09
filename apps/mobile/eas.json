@@ -29,7 +29,8 @@
         "EXPO_PUBLIC_BFF_URL": "https://loyalty-bff.onrender.com/api/v1"
       },
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
       }
     },
     "production": {
