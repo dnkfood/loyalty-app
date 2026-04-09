@@ -5,9 +5,13 @@ import type { SmsGateway, SmsResult, SmsDeliveryStatus } from './sms-gateway.int
 /**
  * AlfaSMS gateway (alfasms.info).
  *
- * Uses the legacy `method=push_msg` / `method=get_msg_report` HTTP API at
+ * Uses the `method=push_msg` / `method=get_msg_report` HTTP API at
  * http://api.alfasms.info (plain HTTP). Requests are GET with query params;
  * responses are JSON wrapped in `{ response: { msg, data } }`.
+ *
+ * Authentication: `key=<API_KEY>` query param (no email/password). The
+ * `ALFA_SMS_LOGIN` / `ALFA_SMS_PASSWORD` env vars from the legacy auth
+ * mode are intentionally ignored.
  *
  * The gateway accepts any phone format and normalizes to the 11-digit
  * country-code form (`7XXXXXXXXXX`) that AlfaSMS expects.
@@ -39,10 +43,9 @@ export class AlfaSmsGateway implements SmsGateway {
 
   async sendOtp(phone: string, code: string): Promise<SmsResult> {
     const apiUrl = this.configService.get<string>('app.sms.alfa.apiUrl');
-    const email = this.configService.get<string>('app.sms.alfa.login');
-    const password = this.configService.get<string>('app.sms.alfa.password');
+    const apiKey = this.configService.get<string>('app.sms.alfa.apiKey');
 
-    if (!apiUrl || !email || !password) {
+    if (!apiUrl || !apiKey) {
       return { success: false, error: 'AlfaSMS not configured' };
     }
 
@@ -54,8 +57,7 @@ export class AlfaSmsGateway implements SmsGateway {
     try {
       const params = new URLSearchParams({
         method: 'push_msg',
-        email,
-        password,
+        key: apiKey,
         phone: normalizedPhone,
         message: `Ваш код: ${code}`,
         format: 'json',
@@ -92,16 +94,14 @@ export class AlfaSmsGateway implements SmsGateway {
 
   async getDeliveryStatus(messageId: string): Promise<SmsDeliveryStatus> {
     const apiUrl = this.configService.get<string>('app.sms.alfa.apiUrl');
-    const email = this.configService.get<string>('app.sms.alfa.login');
-    const password = this.configService.get<string>('app.sms.alfa.password');
+    const apiKey = this.configService.get<string>('app.sms.alfa.apiKey');
 
-    if (!apiUrl || !email || !password) return 'unknown';
+    if (!apiUrl || !apiKey) return 'unknown';
 
     try {
       const params = new URLSearchParams({
         method: 'get_msg_report',
-        email,
-        password,
+        key: apiKey,
         id: messageId,
         format: 'json',
       });

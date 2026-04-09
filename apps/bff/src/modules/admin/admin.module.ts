@@ -12,6 +12,7 @@ import { SmsLogsController } from './sms-logs/sms-logs.controller';
 import { SmsLogsService } from './sms-logs/sms-logs.service';
 import { DashboardController } from './dashboard/dashboard.controller';
 import { DashboardService } from './dashboard/dashboard.service';
+import { AdminOpsController } from './admin-ops.controller';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
@@ -25,6 +26,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     SmsLogsController,
     DashboardController,
     AuditController,
+    AdminOpsController,
   ],
   providers: [
     AdminUsersService,
