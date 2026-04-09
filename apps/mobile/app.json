@@ -22,8 +22,6 @@
       },
       "package": "com.loyalty.app",
       "permissions": [
-        "USE_BIOMETRIC",
-        "USE_FINGERPRINT",
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT"
       ]
@@ -45,7 +43,9 @@
         "expo-build-properties",
         {
           "android": {
-            "minSdkVersion": 26
+            "minSdkVersion": 28,
+            "targetSdkVersion": 33,
+            "compileSdkVersion": 34
           }
         }
       ]
