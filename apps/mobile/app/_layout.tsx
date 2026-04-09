@@ -1,15 +1,9 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { Stack } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
-import * as SplashScreen from 'expo-splash-screen';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
-
-// Keep the native splash screen visible while we initialize
-SplashScreen.preventAutoHideAsync().catch(() => {
-  // Ignore — splash screen may already be hidden
-});
 
 // Global unhandled error/rejection handler
 if (typeof ErrorUtils !== 'undefined') {
@@ -82,27 +76,19 @@ function useAuthStoreHydration(): { hasHydrated: boolean; isAuthenticated: boole
 function RootLayout() {
   const { hasHydrated, isAuthenticated } = useAuthStoreHydration();
 
-  const onLayoutReady = useCallback(async () => {
-    if (hasHydrated) {
-      await SplashScreen.hideAsync().catch(() => {});
-    }
-  }, [hasHydrated]);
-
   if (!hasHydrated) {
     return (
-      <View style={styles.loading} onLayout={() => void onLayoutReady()}>
+      <View style={styles.loading}>
         <ActivityIndicator size="large" color="#007AFF" />
       </View>
     );
   }
 
   return (
-    <View style={styles.root} onLayout={() => void onLayoutReady()}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" redirect={isAuthenticated} />
-        <Stack.Screen name="(app)" redirect={!isAuthenticated} />
-      </Stack>
-    </View>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(auth)" redirect={isAuthenticated} />
+      <Stack.Screen name="(app)" redirect={!isAuthenticated} />
+    </Stack>
   );
 }
 
@@ -137,9 +123,6 @@ export default function Layout() {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
   loading: {
     flex: 1,
     justifyContent: 'center',
