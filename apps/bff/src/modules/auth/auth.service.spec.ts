@@ -7,6 +7,7 @@ import * as bcrypt from 'bcryptjs';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LoyaltySystemClient } from '../loyalty/loyalty-system.client';
+import { SmsService } from '../notifications/sms/sms.service';
 
 describe('AuthService', () => {
   let authService: AuthService;
@@ -14,6 +15,7 @@ describe('AuthService', () => {
   let jwtService: DeepMockProxy<JwtService>;
   let configService: DeepMockProxy<ConfigService>;
   let loyaltyClient: DeepMockProxy<LoyaltySystemClient>;
+  let smsService: DeepMockProxy<SmsService>;
 
   const phone = '79991234567';
   const userId = 'user-1';
@@ -29,6 +31,7 @@ describe('AuthService', () => {
     jwtService = mockDeep<JwtService>();
     configService = mockDeep<ConfigService>();
     loyaltyClient = mockDeep<LoyaltySystemClient>();
+    smsService = mockDeep<SmsService>();
 
     const module = await Test.createTestingModule({
       providers: [
@@ -37,6 +40,7 @@ describe('AuthService', () => {
         { provide: JwtService, useValue: jwtService },
         { provide: ConfigService, useValue: configService },
         { provide: LoyaltySystemClient, useValue: loyaltyClient },
+        { provide: SmsService, useValue: smsService },
       ],
     }).compile();
 
@@ -44,14 +48,9 @@ describe('AuthService', () => {
   });
 
   describe('sendOtp', () => {
-    it('should call loyalty system SmsCode and store hash in DB', async () => {
-      // Guest already exists
-      loyaltyClient.getGuestInfo.mockResolvedValue({
-        balance: 200, bonusPercent: 5, maxPercent: 30,
-        cardCode: '810885688', guestName: 'Test', nextLevelSumma: 25000,
-        statusLevel: 'FRIEND', cell: phone, levels: [],
-      });
-      loyaltyClient.sendSmsCode.mockResolvedValue({ smsCode: '8674830' });
+    it('should generate OTP, send via SmsService, ping loyalty, and store hash', async () => {
+      smsService.sendOtp.mockResolvedValue({ success: true, messageId: 'msg-1' });
+      loyaltyClient.sendSmsCode.mockResolvedValue(undefined);
       prisma.otpCode.updateMany.mockResolvedValue({ count: 0 });
       prisma.otpCode.create.mockResolvedValue({
         id: 'otp-1', phone, codeHash: 'hash', attempts: 0,
@@ -62,6 +61,7 @@ describe('AuthService', () => {
       const result = await authService.sendOtp({ phone });
 
       expect(result).toEqual({ message: 'OTP sent successfully' });
+      expect(smsService.sendOtp).toHaveBeenCalledWith(phone, expect.any(String));
       expect(loyaltyClient.sendSmsCode).toHaveBeenCalledWith(phone);
       expect(prisma.otpCode.create).toHaveBeenCalledWith({
         data: {
@@ -72,10 +72,19 @@ describe('AuthService', () => {
       });
     });
 
-    it('should auto-register guest if not found in loyalty system', async () => {
-      loyaltyClient.getGuestInfo.mockRejectedValue(new Error('not found'));
-      loyaltyClient.registerGuest.mockResolvedValue({ registered: true, message: 'OK' });
-      loyaltyClient.sendSmsCode.mockResolvedValue({ smsCode: '123456' });
+    it('should propagate ServiceUnavailable if SMS provider fails', async () => {
+      smsService.sendOtp.mockResolvedValue({ success: false, error: 'down' });
+
+      await expect(authService.sendOtp({ phone })).rejects.toThrow(
+        'Failed to send SMS code',
+      );
+      // Loyalty must NOT be pinged if the real SMS never went out
+      expect(loyaltyClient.sendSmsCode).not.toHaveBeenCalled();
+    });
+
+    it('should still succeed if loyalty ping fails (best-effort)', async () => {
+      smsService.sendOtp.mockResolvedValue({ success: true, messageId: 'msg-1' });
+      loyaltyClient.sendSmsCode.mockRejectedValue(new Error('loyalty down'));
       prisma.otpCode.updateMany.mockResolvedValue({ count: 0 });
       prisma.otpCode.create.mockResolvedValue({
         id: 'otp-1', phone, codeHash: 'hash', attempts: 0,
@@ -83,10 +92,10 @@ describe('AuthService', () => {
       });
       configService.get.mockReturnValue('production');
 
-      await authService.sendOtp({ phone });
+      const result = await authService.sendOtp({ phone });
 
-      expect(loyaltyClient.registerGuest).toHaveBeenCalledWith(phone, phone);
-      expect(loyaltyClient.sendSmsCode).toHaveBeenCalledWith(phone);
+      expect(result).toEqual({ message: 'OTP sent successfully' });
+      expect(prisma.otpCode.create).toHaveBeenCalled();
     });
   });
 
@@ -105,7 +114,6 @@ describe('AuthService', () => {
       prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
       prisma.user.update.mockResolvedValue(mockUser);
       prisma.authSession.create.mockResolvedValue({} as any);
-      loyaltyClient.approveCode.mockResolvedValue({ approved: true });
       loyaltyClient.getGuestInfo.mockResolvedValue({
         balance: 200, bonusPercent: 5, maxPercent: 30,
         cardCode: '810885688', guestName: 'Test', nextLevelSumma: 25000,
@@ -119,7 +127,6 @@ describe('AuthService', () => {
       expect(result.accessToken).toBe('access-token');
       expect(result.refreshToken).toBe('refresh-token');
       expect(result.user.id).toBe(userId);
-      expect(loyaltyClient.approveCode).toHaveBeenCalledWith(phone, code);
     });
 
     it('should throw OTP_EXPIRED if no valid OTP found', async () => {
@@ -167,7 +174,6 @@ describe('AuthService', () => {
       prisma.user.update.mockResolvedValue({ ...newUser, externalGuestId: '810885688' });
       prisma.user.findUniqueOrThrow.mockResolvedValue({ ...newUser, externalGuestId: '810885688' });
       prisma.authSession.create.mockResolvedValue({} as any);
-      loyaltyClient.approveCode.mockResolvedValue({ approved: true });
       loyaltyClient.getGuestInfo.mockResolvedValue({
         balance: 200, bonusPercent: 5, maxPercent: 30,
         cardCode: '810885688', guestName: null, nextLevelSumma: 25000,

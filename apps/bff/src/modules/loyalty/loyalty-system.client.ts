@@ -1,12 +1,11 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
   ServiceUnavailableException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { XMLParser } from 'fast-xml-parser';
 import { maskPhone } from '@loyalty/shared-utils';
 
 // --- DTOs ---
@@ -30,19 +29,6 @@ export interface LoyaltyLevelDto {
   bonusPercent: number;
 }
 
-export interface LoyaltySmsCodeDto {
-  smsCode: string;
-}
-
-export interface LoyaltyApproveDto {
-  approved: boolean;
-}
-
-export interface LoyaltyRegisterDto {
-  registered: boolean;
-  message: string;
-}
-
 export interface LoyaltyHistoryItemDto {
   date: string;
   summa: number;
@@ -54,46 +40,61 @@ export interface LoyaltyHistoryDto {
   items: LoyaltyHistoryItemDto[];
 }
 
-// --- XML response shapes ---
+// --- New JSON response shapes ---
+// TODO(api-verify): These field names are assumed to mirror the legacy XML
+// element names (snake_case). They have NOT been verified against a real
+// response from the new HTTP+JSON loyalty API at http://45.84.87.169:5100.
+// Test against the live API and adjust field names below if they differ.
 
-interface XmlResult {
-  code: number | string;
+interface LoyaltyErrorEnvelope {
+  code?: number | string;
   name?: string;
-  command?: string;
+}
+
+interface InfoResponseJson extends LoyaltyErrorEnvelope {
   summa?: number | string;
   bonus_percent?: number | string;
   max_percent?: number | string;
   card_code?: number | string;
   people?: string;
-  birthday?: string;
   next_level_summa?: number | string;
   name_level?: string;
   cell?: string;
-  sms_code?: number | string;
-  levels?: XmlLevel | XmlLevel[];
+  levels?: LevelJson | LevelJson[];
 }
 
-interface XmlLevel {
+interface LevelJson {
   name: string;
   l_bnd: number | string;
   r_bnd: number | string;
   bonus_percent: number | string;
 }
 
-interface XmlRoot {
-  root: {
-    result: XmlResult | XmlResult[];
-  };
+interface CodeResponseJson extends LoyaltyErrorEnvelope {
+  // Returned by the loyalty system but intentionally ignored by the BFF.
+  // BFF generates and verifies its own OTP; this endpoint is called only
+  // to trigger the loyalty system's outbound SMS gateway.
+  sms_code?: string | number;
+}
+
+interface TransactionItemJson {
+  name?: string; // date string
+  summa?: number | string;
+  bonus_percent?: number | string;
+  command?: string;
+}
+
+interface TransactionResponseJson extends LoyaltyErrorEnvelope {
+  // TODO(api-verify): unknown which of these shapes the new API uses.
+  // The legacy XML returned multiple <result> nodes; the JSON port may
+  // expose them as `results: [...]`, `result: [...]`, or a top-level array.
+  results?: TransactionItemJson[];
+  result?: TransactionItemJson | TransactionItemJson[];
 }
 
 @Injectable()
 export class LoyaltySystemClient {
   private readonly logger = new Logger(LoyaltySystemClient.name);
-  private readonly parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '@_',
-    trimValues: true,
-  });
   private readonly baseUrl: string;
 
   constructor(private readonly configService: ConfigService) {
@@ -104,161 +105,136 @@ export class LoyaltySystemClient {
   }
 
   /**
-   * GET /api/xml/gate/Info?cell={phone}
+   * POST /?query=info&phone={phone}
    * Returns guest balance, status level, bonus percent, levels.
    */
   async getGuestInfo(phone: string): Promise<LoyaltyGuestInfoDto> {
-    const result = await this.request(`/api/xml/gate/Info?cell=${phone}`);
-
-    const levels = this.parseLevels(result.levels);
+    const normalized = this.normalizePhone(phone);
+    const data = await this.post<InfoResponseJson>('info', { phone: normalized });
+    this.assertNoError(data);
 
     return {
-      balance: parseFloat(String(result.summa ?? '0')),
-      bonusPercent: Number(result.bonus_percent ?? 0),
-      maxPercent: Number(result.max_percent ?? 0),
-      cardCode: String(result.card_code ?? ''),
-      guestName: result.people?.trim() || null,
-      nextLevelSumma: result.next_level_summa != null
-        ? parseFloat(String(result.next_level_summa))
-        : null,
-      statusLevel: result.name_level ?? 'FRIEND',
-      cell: String(result.cell ?? phone),
-      levels,
+      balance: parseFloat(String(data.summa ?? '0')),
+      bonusPercent: Number(data.bonus_percent ?? 0),
+      maxPercent: Number(data.max_percent ?? 0),
+      cardCode: String(data.card_code ?? ''),
+      guestName: data.people?.trim() || null,
+      nextLevelSumma:
+        data.next_level_summa != null
+          ? parseFloat(String(data.next_level_summa))
+          : null,
+      statusLevel: data.name_level ?? 'FRIEND',
+      cell: String(data.cell ?? normalized),
+      levels: this.parseLevels(data.levels),
     };
   }
 
   /**
-   * GET /api/xml/gate/History?cell={phone}
-   * Returns transaction history.
+   * POST /?query=code&phone={phone}
+   * Triggers the loyalty system to send an SMS code to the user's phone.
+   *
+   * NOTE: The loyalty system also returns the code in `sms_code` for
+   * server-side use (e.g. cashier-side payment confirmation flows). The BFF
+   * auth flow does NOT consume this value — it generates and verifies its
+   * own OTP. This call exists purely as a side-effect trigger for the
+   * outbound SMS via the loyalty system's gateway.
    */
-  async getHistory(phone: string, from?: string, to?: string): Promise<LoyaltyHistoryDto> {
-    let url = `/api/xml/gate/History?cell=${phone}`;
-    if (from) url += `&from=${from}`;
-    if (to) url += `&to=${to}`;
+  async sendSmsCode(phone: string): Promise<void> {
+    const normalized = this.normalizePhone(phone);
+    const data = await this.post<CodeResponseJson>('code', { phone: normalized });
+    this.assertNoError(data);
+  }
 
-    const text = await this.rawRequest(url);
+  /**
+   * POST /?query=transaction&phone={phone}&begda={from}&enda={to}
+   * Returns transaction history for the given phone within the date range.
+   */
+  async getHistory(
+    phone: string,
+    from?: string,
+    to?: string,
+  ): Promise<LoyaltyHistoryDto> {
+    const normalized = this.normalizePhone(phone);
+    const params: Record<string, string> = { phone: normalized };
+    if (from) params.begda = from;
+    if (to) params.enda = to;
 
-    // History may return multiple <result> nodes or an error
+    let data: TransactionResponseJson;
     try {
-      const parsed = this.parseXml(text);
-      const results = Array.isArray(parsed.root.result)
-        ? parsed.root.result
-        : [parsed.root.result];
-
-      // First result with code=-1 means no history
-      const first = results[0];
-      if (first && Number(first.code) < 0) {
-        return { items: [] };
-      }
-
-      const items: LoyaltyHistoryItemDto[] = results
-        .filter((r) => r.summa !== undefined)
-        .map((r) => ({
-          date: String(r.name ?? ''),
-          summa: parseFloat(String(r.summa ?? '0')),
-          bonus: parseFloat(String(r.bonus_percent ?? '0')),
-          operation: String(r.command ?? ''),
-        }));
-
-      return { items };
+      data = await this.post<TransactionResponseJson>('transaction', params);
     } catch {
       return { items: [] };
     }
-  }
 
-  /**
-   * GET /api/xml/gate/SmsCode?cell={phone}
-   * Sends SMS code to the phone via the loyalty system.
-   * Returns the code (for server-side verification tracking).
-   */
-  async sendSmsCode(phone: string): Promise<LoyaltySmsCodeDto> {
-    const result = await this.request(`/api/xml/gate/SmsCode?cell=${phone}`);
-    return {
-      smsCode: String(result.sms_code ?? ''),
-    };
-  }
-
-  /**
-   * GET /api/xml/gate/Approve?cell={phone}&code={code}
-   * Verifies the SMS code sent to the phone.
-   */
-  async approveCode(phone: string, code: string): Promise<LoyaltyApproveDto> {
-    try {
-      await this.request(`/api/xml/gate/Approve?cell=${phone}&code=${code}`);
-      return { approved: true };
-    } catch {
-      return { approved: false };
+    // Negative code = no history (or upstream error). Return empty list.
+    if (data.code != null && Number(data.code) < 0) {
+      return { items: [] };
     }
-  }
 
-  /**
-   * GET /api/xml/gate/Register?cell={phone}&people={name}&birthday={birthday}
-   * Registers a new guest in the loyalty system.
-   */
-  async registerGuest(
-    phone: string,
-    name: string,
-    birthday?: string,
-  ): Promise<LoyaltyRegisterDto> {
-    let url = `/api/xml/gate/Register?cell=${phone}&people=${encodeURIComponent(name)}`;
-    if (birthday) url += `&birthday=${birthday}`;
+    // TODO(api-verify): adjust this once we know the real response shape.
+    const rawItems: TransactionItemJson[] = Array.isArray(data.results)
+      ? data.results
+      : Array.isArray(data.result)
+        ? data.result
+        : data.result
+          ? [data.result]
+          : [];
 
-    const result = await this.request(url);
-    return {
-      registered: true,
-      message: String(result.name ?? 'Registered'),
-    };
-  }
+    const items: LoyaltyHistoryItemDto[] = rawItems
+      .filter((r) => r.summa !== undefined)
+      .map((r) => ({
+        date: String(r.name ?? ''),
+        summa: parseFloat(String(r.summa ?? '0')),
+        bonus: parseFloat(String(r.bonus_percent ?? '0')),
+        operation: String(r.command ?? ''),
+      }));
 
-  /**
-   * GET /api/xml/gate/QrCode?cell={phone}
-   * Returns QR code data for the guest.
-   */
-  async getQrCode(phone: string): Promise<string> {
-    try {
-      const result = await this.request(`/api/xml/gate/QrCode?cell=${phone}`);
-      return String(result.name ?? '');
-    } catch (err) {
-      this.logger.warn(`QrCode endpoint failed for ${maskPhone(phone)}: ${(err as Error).message}`);
-      // QrCode endpoint may not be available — fall back to card_code
-      const info = await this.getGuestInfo(phone);
-      return info.cardCode;
-    }
+    return { items };
   }
 
   // --- Internal helpers ---
 
-  private async request(path: string): Promise<XmlResult> {
-    const text = await this.rawRequest(path);
-    const parsed = this.parseXml(text);
-
-    const result = Array.isArray(parsed.root.result)
-      ? parsed.root.result[0]
-      : parsed.root.result;
-
-    if (!result) {
-      throw new ServiceUnavailableException('Invalid response from loyalty system');
+  /**
+   * Normalizes a phone number to the 10-digit format expected by the new
+   * loyalty API. Strips non-digit characters and drops a leading 7 or 8
+   * country/city prefix if present (Russian numbering).
+   *
+   * Examples:
+   *   "+7 (911) 111-11-11" -> "9111111111"
+   *   "89111111111"        -> "9111111111"
+   *   "9111111111"         -> "9111111111"
+   */
+  private normalizePhone(phone: string): string {
+    const digits = phone.replace(/\D/g, '');
+    let result = digits;
+    if (
+      digits.length === 11 &&
+      (digits.startsWith('7') || digits.startsWith('8'))
+    ) {
+      result = digits.slice(1);
     }
-
-    const code = Number(result.code);
-    if (code < 0) {
-      const msg = result.name ?? 'Unknown loyalty system error';
-      if (msg.includes('не найден') || msg.includes('Не найден')) {
-        throw new NotFoundException(`Loyalty: ${msg}`);
-      }
-      throw new ServiceUnavailableException(`Loyalty: ${msg} (code ${code})`);
+    if (result.length !== 10) {
+      throw new BadRequestException(
+        `Invalid phone format: expected 10 digits after normalization, got ${result.length}`,
+      );
     }
-
     return result;
   }
 
-  private async rawRequest(path: string): Promise<string> {
-    const url = `${this.baseUrl}${path}`;
-    this.logger.debug(`Loyalty API: ${url.replace(/cell=\d+/, 'cell=***')}`);
+  private async post<T>(
+    query: string,
+    params: Record<string, string>,
+  ): Promise<T> {
+    const qs = new URLSearchParams({ query, ...params }).toString();
+    const url = `${this.baseUrl}/?${qs}`;
+    this.logger.debug(
+      `Loyalty API: POST ${url.replace(/phone=\d+/, `phone=${maskPhone(params.phone ?? '')}`)}`,
+    );
 
     let response: Response;
     try {
       response = await fetch(url, {
+        method: 'POST',
         signal: AbortSignal.timeout(10_000),
       });
     } catch (err) {
@@ -268,22 +244,38 @@ export class LoyaltySystemClient {
     }
 
     if (!response.ok) {
-      throw new ServiceUnavailableException(`Loyalty system HTTP ${response.status}`);
+      throw new ServiceUnavailableException(
+        `Loyalty system HTTP ${response.status}`,
+      );
     }
 
-    return response.text();
-  }
-
-  private parseXml(text: string): XmlRoot {
-    // Response may be JSON (some endpoints) or XML
-    if (text.trimStart().startsWith('{')) {
-      const json = JSON.parse(text) as { root: XmlResult & { name?: string; code?: number } };
-      return { root: { result: json.root as unknown as XmlResult } };
+    const text = await response.text();
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      throw new ServiceUnavailableException(
+        `Loyalty system returned non-JSON response`,
+      );
     }
-    return this.parser.parse(text) as XmlRoot;
   }
 
-  private parseLevels(raw: XmlLevel | XmlLevel[] | undefined): LoyaltyLevelDto[] {
+  private assertNoError(data: LoyaltyErrorEnvelope): void {
+    if (data.code == null) return;
+    const code = Number(data.code);
+    if (code < 0) {
+      const msg = data.name ?? 'Unknown loyalty system error';
+      if (msg.includes('не найден') || msg.includes('Не найден')) {
+        throw new NotFoundException(`Loyalty: ${msg}`);
+      }
+      throw new ServiceUnavailableException(
+        `Loyalty: ${msg} (code ${code})`,
+      );
+    }
+  }
+
+  private parseLevels(
+    raw: LevelJson | LevelJson[] | undefined,
+  ): LoyaltyLevelDto[] {
     if (!raw) return [];
     const arr = Array.isArray(raw) ? raw : [raw];
     return arr.map((l) => ({

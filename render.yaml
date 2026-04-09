@@ -40,13 +40,13 @@ services:
       - key: JWT_REFRESH_TTL
         value: "2592000"
       - key: SMS_PRIMARY_PROVIDER
-        value: mock
+        value: alfa
       - key: BEELINE_SMS_API_URL
         value: ""
       - key: BEELINE_SMS_API_KEY
         value: ""
       - key: ALFA_SMS_API_URL
-        value: ""
+        value: "http://api.alfasms.info"
       - key: ALFA_SMS_API_KEY
         value: ""
       - key: ALFA_SMS_LOGIN

@@ -10,10 +10,12 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
+import { randomInt } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { maskPhone } from '@loyalty/shared-utils';
 import { ErrorCodes } from '@loyalty/shared-types';
 import { LoyaltySystemClient } from '../loyalty/loyalty-system.client';
+import { SmsService } from '../notifications/sms/sms.service';
 import type { SendOtpDto } from './dto/send-otp.dto';
 import type { VerifyOtpDto } from './dto/verify-otp.dto';
 
@@ -30,38 +32,43 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly loyaltyClient: LoyaltySystemClient,
+    private readonly smsService: SmsService,
   ) {}
 
   /**
-   * Sends OTP via the loyalty system's built-in SMS service.
-   * The loyalty system sends the SMS and returns the code.
-   * We store the code hash in our DB for rate-limiting and tracking.
+   * Sends OTP for login. The BFF generates its own random 6-digit OTP,
+   * sends it via the SMS provider (Beeline/Alfa with failover), and also
+   * pings the loyalty system's `?query=code` endpoint as a best-effort
+   * side-effect (it may trigger internal notifications on their side).
+   *
+   * - SMS provider failure is hard: we throw, the user gets nothing.
+   * - Loyalty ping failure is soft: we log and continue, since the real
+   *   SMS has already gone out.
    */
   async sendOtp(dto: SendOtpDto, ipAddress?: string): Promise<{ message: string }> {
     const { phone } = dto;
 
     this.logger.log(`OTP send requested`, { phone: maskPhone(phone), ip: ipAddress });
 
-    // Register guest in loyalty system if not exists (idempotent)
-    try {
-      await this.loyaltyClient.getGuestInfo(phone);
-    } catch {
-      this.logger.log(`Guest not found, auto-registering`, { phone: maskPhone(phone) });
-      try {
-        await this.loyaltyClient.registerGuest(phone, phone);
-      } catch (regErr) {
-        this.logger.warn(`Auto-register failed: ${(regErr as Error).message}`);
-      }
+    // Generate our own OTP — never trust an upstream to be the source of
+    // truth for auth credentials.
+    const smsCode = String(randomInt(100000, 1000000));
+
+    // Send the real SMS via our provider. Hard fail on error.
+    const smsResult = await this.smsService.sendOtp(phone, smsCode);
+    if (!smsResult.success) {
+      this.logger.error(`SMS provider failed: ${smsResult.error ?? 'unknown'}`);
+      throw new ServiceUnavailableException('Failed to send SMS code');
     }
 
-    // Send SMS via loyalty system
-    let smsCode: string;
+    // Best-effort: ping the loyalty system so it can fire its own internal
+    // notification. We do not depend on the result.
     try {
-      const result = await this.loyaltyClient.sendSmsCode(phone);
-      smsCode = result.smsCode;
+      await this.loyaltyClient.sendSmsCode(phone);
     } catch (err) {
-      this.logger.error(`Loyalty SmsCode failed: ${(err as Error).message}`);
-      throw new ServiceUnavailableException('Failed to send SMS code');
+      this.logger.warn(
+        `Loyalty sendSmsCode failed (non-blocking): ${(err as Error).message}`,
+      );
     }
 
     // Invalidate previous OTP codes for this phone
@@ -134,13 +141,6 @@ export class AuthService {
         code: ErrorCodes.OTP_INVALID,
         message: 'Invalid OTP code',
       });
-    }
-
-    // Also confirm with the loyalty system
-    const approval = await this.loyaltyClient.approveCode(phone, code);
-    if (!approval.approved) {
-      this.logger.warn(`Loyalty Approve rejected code for ${maskPhone(phone)}`);
-      // Don't block — our hash matched, loyalty system may have timing issues
     }
 
     // Mark OTP as used
