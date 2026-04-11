@@ -15,9 +15,7 @@ export default registerAs('app', () => ({
   },
   push: {
     maxPerUserPerDay: parseInt(process.env.PUSH_MAX_PER_USER_PER_DAY ?? '3', 10),
-    fcm: {
-      serverKey: process.env.FCM_SERVER_KEY ?? '',
-    },
+    fcm: { serverKey: process.env.FCM_SERVER_KEY ?? '' },
     apns: {
       keyId: process.env.APNS_KEY_ID ?? '',
       teamId: process.env.APNS_TEAM_ID ?? '',
@@ -28,8 +26,10 @@ export default registerAs('app', () => ({
   sms: {
     primaryProvider: process.env.SMS_PRIMARY_PROVIDER ?? 'beeline',
     beeline: {
-      apiUrl: process.env.BEELINE_SMS_API_URL ?? '',
-      apiKey: process.env.BEELINE_SMS_API_KEY ?? '',
+      apiUrl: process.env.BEELINE_SMS_API_URL ?? 'https://a2p-sms-https.beeline.ru/proto/http/',
+      login: process.env.BEELINE_SMS_LOGIN ?? '',
+      password: process.env.BEELINE_SMS_PASSWORD ?? '',
+      sender: process.env.BEELINE_SMS_SENDER ?? 'DNKFOOD',
     },
     alfa: {
       apiUrl: process.env.ALFA_SMS_API_URL ?? '',
