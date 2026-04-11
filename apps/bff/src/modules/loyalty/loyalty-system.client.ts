@@ -17,11 +17,6 @@ export interface LoyaltyGuestInfoDto {
   cardCode: string;
   guestName: string | null;
   nextLevelSumma: number | null;
-  /**
-   * Accumulated spend toward the next status level (loyalty `summa_a` field).
-   * Null if the loyalty system doesn't include it in the response — caller
-   * should fall back to `balance` as a proxy.
-   */
   currentSpend: number | null;
   statusLevel: string;
   cell: string;
@@ -46,58 +41,58 @@ export interface LoyaltyHistoryDto {
   items: LoyaltyHistoryItemDto[];
 }
 
-// --- New JSON response shapes ---
-// TODO(api-verify): These field names are assumed to mirror the legacy XML
-// element names (snake_case). They have NOT been verified against a real
-// response from the new HTTP+JSON loyalty API at http://45.84.87.169:5100.
-// Test against the live API and adjust field names below if they differ.
+// --- Raw JSON response shapes from /api/Gate/* ---
+// All responses are wrapped in { root: { result: ... } }
 
-interface LoyaltyErrorEnvelope {
-  code?: number | string;
-  name?: string;
+interface GateEnvelope<T> {
+  root: {
+    result: T;
+  };
 }
 
-interface InfoResponseJson extends LoyaltyErrorEnvelope {
-  summa?: number | string;
-  // Accumulated spend toward next level (legacy XML field name).
-  summa_a?: number | string;
-  bonus_percent?: number | string;
-  max_percent?: number | string;
-  card_code?: number | string;
+interface InfoResult {
+  name?: string;
+  command?: string;
+  code?: string;
+  summa?: string;
+  bonus_percent?: string;
+  max_percent?: string;
+  card_code?: string;
   people?: string;
-  next_level_summa?: number | string;
+  birthday?: string;
+  e_mail?: string;
+  region_id?: string;
+  next_level_summa?: string;
   name_level?: string;
   cell?: string;
-  levels?: LevelJson | LevelJson[];
+  summa_a?: string;
+  levels?: LevelResult[];
 }
 
-interface LevelJson {
+interface LevelResult {
   name: string;
-  l_bnd: number | string;
-  r_bnd: number | string;
-  bonus_percent: number | string;
+  l_bnd: string;
+  r_bnd: string;
+  bonus_percent: string;
 }
 
-interface CodeResponseJson extends LoyaltyErrorEnvelope {
-  // Returned by the loyalty system but intentionally ignored by the BFF.
-  // BFF generates and verifies its own OTP; this endpoint is called only
-  // to trigger the loyalty system's outbound SMS gateway.
-  sms_code?: string | number;
-}
-
-interface TransactionItemJson {
-  name?: string; // date string
-  summa?: number | string;
-  bonus_percent?: number | string;
+interface SmsCodeResult {
+  code?: string;
+  sms_code?: string;
   command?: string;
 }
 
-interface TransactionResponseJson extends LoyaltyErrorEnvelope {
-  // TODO(api-verify): unknown which of these shapes the new API uses.
-  // The legacy XML returned multiple <result> nodes; the JSON port may
-  // expose them as `results: [...]`, `result: [...]`, or a top-level array.
-  results?: TransactionItemJson[];
-  result?: TransactionItemJson | TransactionItemJson[];
+interface QrCodeResult {
+  code?: string;
+  command?: string;
+  qr_code?: string;
+}
+
+interface TransactionResult {
+  name?: string;
+  summa?: string;
+  bonus_percent?: string;
+  command?: string;
 }
 
 @Injectable()
@@ -113,90 +108,83 @@ export class LoyaltySystemClient {
   }
 
   /**
-   * POST /?query=info&phone={phone}
+   * GET /api/Gate/Info?cell={cell}
    * Returns guest balance, status level, bonus percent, levels.
    */
   async getGuestInfo(phone: string): Promise<LoyaltyGuestInfoDto> {
-    const normalized = this.normalizePhone(phone);
-    const data = await this.post<InfoResponseJson>('info', { phone: normalized });
-    this.assertNoError(data);
+    const cell = this.normalizePhone(phone);
+    const data = await this.get<GateEnvelope<InfoResult>>('Info', { cell });
+    const r = data.root.result;
+    this.assertCode(r.code);
 
     return {
-      balance: parseFloat(String(data.summa ?? '0')),
-      bonusPercent: Number(data.bonus_percent ?? 0),
-      maxPercent: Number(data.max_percent ?? 0),
-      cardCode: String(data.card_code ?? ''),
-      guestName: data.people?.trim() || null,
+      balance: parseFloat(r.summa ?? '0'),
+      bonusPercent: Number(r.bonus_percent ?? 0),
+      maxPercent: Number(r.max_percent ?? 0),
+      cardCode: r.card_code ?? '',
+      guestName: r.people?.trim() || null,
       nextLevelSumma:
-        data.next_level_summa != null
-          ? parseFloat(String(data.next_level_summa))
-          : null,
-      currentSpend:
-        data.summa_a != null ? parseFloat(String(data.summa_a)) : null,
-      statusLevel: data.name_level ?? 'FRIEND',
-      cell: String(data.cell ?? normalized),
-      levels: this.parseLevels(data.levels),
+        r.next_level_summa != null ? parseFloat(r.next_level_summa) : null,
+      currentSpend: r.summa_a != null ? parseFloat(r.summa_a) : null,
+      statusLevel: r.name_level ?? 'FRIEND',
+      cell: r.cell ?? cell,
+      levels: this.parseLevels(r.levels),
     };
   }
 
   /**
-   * POST /?query=code&phone={phone}
+   * GET /api/Gate/SmsCode?cell={cell}
    * Triggers the loyalty system to send an SMS code to the user's phone.
-   *
-   * NOTE: The loyalty system also returns the code in `sms_code` for
-   * server-side use (e.g. cashier-side payment confirmation flows). The BFF
-   * auth flow does NOT consume this value — it generates and verifies its
-   * own OTP. This call exists purely as a side-effect trigger for the
-   * outbound SMS via the loyalty system's gateway.
    */
   async sendSmsCode(phone: string): Promise<void> {
-    const normalized = this.normalizePhone(phone);
-    const data = await this.post<CodeResponseJson>('code', { phone: normalized });
-    this.assertNoError(data);
+    const cell = this.normalizePhone(phone);
+    const data = await this.get<GateEnvelope<SmsCodeResult>>('SmsCode', { cell });
+    this.assertCode(data.root.result.code);
   }
 
   /**
-   * POST /?query=transaction&phone={phone}&begda={from}&enda={to}
+   * GET /api/Gate/QrCode?cell={cell}
+   * Returns QR code data for the guest.
+   */
+  async getQrCode(phone: string): Promise<string | null> {
+    const cell = this.normalizePhone(phone);
+    const data = await this.get<GateEnvelope<QrCodeResult>>('QrCode', { cell });
+    this.assertCode(data.root.result.code);
+    return data.root.result.qr_code ?? null;
+  }
+
+  /**
+   * GET /api/Gate/Transaction?cell={cell}&begda={from}&enda={to}
    * Returns transaction history for the given phone within the date range.
+   * The result can be a single object or an array of objects.
    */
   async getHistory(
     phone: string,
     from?: string,
     to?: string,
   ): Promise<LoyaltyHistoryDto> {
-    const normalized = this.normalizePhone(phone);
-    const params: Record<string, string> = { phone: normalized };
+    const cell = this.normalizePhone(phone);
+    const params: Record<string, string> = { cell };
     if (from) params.begda = from;
     if (to) params.enda = to;
 
-    let data: TransactionResponseJson;
+    let data: GateEnvelope<TransactionResult | TransactionResult[]>;
     try {
-      data = await this.post<TransactionResponseJson>('transaction', params);
+      data = await this.get('Transaction', params);
     } catch {
       return { items: [] };
     }
 
-    // Negative code = no history (or upstream error). Return empty list.
-    if (data.code != null && Number(data.code) < 0) {
-      return { items: [] };
-    }
-
-    // TODO(api-verify): adjust this once we know the real response shape.
-    const rawItems: TransactionItemJson[] = Array.isArray(data.results)
-      ? data.results
-      : Array.isArray(data.result)
-        ? data.result
-        : data.result
-          ? [data.result]
-          : [];
+    const raw = data.root.result;
+    const rawItems: TransactionResult[] = Array.isArray(raw) ? raw : [raw];
 
     const items: LoyaltyHistoryItemDto[] = rawItems
       .filter((r) => r.summa !== undefined)
       .map((r) => ({
-        date: String(r.name ?? ''),
-        summa: parseFloat(String(r.summa ?? '0')),
-        bonus: parseFloat(String(r.bonus_percent ?? '0')),
-        operation: String(r.command ?? ''),
+        date: r.name ?? '',
+        summa: parseFloat(r.summa ?? '0'),
+        bonus: parseFloat(r.bonus_percent ?? '0'),
+        operation: r.command ?? '',
       }));
 
     return { items };
@@ -205,14 +193,9 @@ export class LoyaltySystemClient {
   // --- Internal helpers ---
 
   /**
-   * Normalizes a phone number to the 10-digit format expected by the new
-   * loyalty API. Strips non-digit characters and drops a leading 7 or 8
-   * country/city prefix if present (Russian numbering).
-   *
-   * Examples:
-   *   "+7 (911) 111-11-11" -> "9111111111"
-   *   "89111111111"        -> "9111111111"
-   *   "9111111111"         -> "9111111111"
+   * Normalizes a phone number to the 10-digit format expected by the
+   * loyalty API (the `cell` parameter). Strips non-digit characters and
+   * drops a leading 7 or 8 country prefix if present.
    */
   private normalizePhone(phone: string): string {
     const digits = phone.replace(/\D/g, '');
@@ -231,20 +214,23 @@ export class LoyaltySystemClient {
     return result;
   }
 
-  private async post<T>(
-    query: string,
+  /**
+   * Makes a GET request to /api/Gate/{command}?{params}
+   */
+  private async get<T>(
+    command: string,
     params: Record<string, string>,
   ): Promise<T> {
-    const qs = new URLSearchParams({ query, ...params }).toString();
-    const url = `${this.baseUrl}/?${qs}`;
+    const qs = new URLSearchParams(params).toString();
+    const url = `${this.baseUrl}/api/Gate/${command}?${qs}`;
     this.logger.debug(
-      `Loyalty API: POST ${url.replace(/phone=\d+/, `phone=${maskPhone(params.phone ?? '')}`)}`,
+      `Loyalty API: GET ${url.replace(/cell=\d+/, `cell=${maskPhone(params.cell ?? '')}`)}`,
     );
 
     let response: Response;
     try {
       response = await fetch(url, {
-        method: 'POST',
+        method: 'GET',
         signal: AbortSignal.timeout(10_000),
       });
     } catch (err) {
@@ -264,34 +250,29 @@ export class LoyaltySystemClient {
       return JSON.parse(text) as T;
     } catch {
       throw new ServiceUnavailableException(
-        `Loyalty system returned non-JSON response`,
+        'Loyalty system returned non-JSON response',
       );
     }
   }
 
-  private assertNoError(data: LoyaltyErrorEnvelope): void {
-    if (data.code == null) return;
-    const code = Number(data.code);
-    if (code < 0) {
-      const msg = data.name ?? 'Unknown loyalty system error';
-      if (msg.includes('не найден') || msg.includes('Не найден')) {
-        throw new NotFoundException(`Loyalty: ${msg}`);
-      }
-      throw new ServiceUnavailableException(
-        `Loyalty: ${msg} (code ${code})`,
-      );
+  /**
+   * Checks the `code` field from the loyalty response.
+   * Code "0" = success, negative = error.
+   */
+  private assertCode(code: string | undefined): void {
+    if (code == null) return;
+    const num = Number(code);
+    if (num < 0) {
+      throw new NotFoundException(`Loyalty error (code ${code})`);
     }
   }
 
-  private parseLevels(
-    raw: LevelJson | LevelJson[] | undefined,
-  ): LoyaltyLevelDto[] {
+  private parseLevels(raw: LevelResult[] | undefined): LoyaltyLevelDto[] {
     if (!raw) return [];
-    const arr = Array.isArray(raw) ? raw : [raw];
-    return arr.map((l) => ({
+    return raw.map((l) => ({
       name: l.name,
-      lowerBound: parseFloat(String(l.l_bnd ?? '0')),
-      upperBound: parseFloat(String(l.r_bnd ?? '0')),
+      lowerBound: parseFloat(l.l_bnd ?? '0'),
+      upperBound: parseFloat(l.r_bnd ?? '0'),
       bonusPercent: Number(l.bonus_percent ?? 0),
     }));
   }
