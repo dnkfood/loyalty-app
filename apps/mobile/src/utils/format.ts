@@ -1,27 +1,51 @@
+const MONTHS_SHORT = [
+  'янв.', 'февр.', 'мар.', 'апр.', 'мая', 'июн.',
+  'июл.', 'авг.', 'сент.', 'окт.', 'нояб.', 'дек.',
+];
+
+/**
+ * Formats a number with space as thousands separator (ru-RU style).
+ * Example: 12345.67 → "12 345,67"
+ */
+function formatNumberRu(value: number, minFrac = 0, maxFrac = 0): string {
+  const fixed = value.toFixed(maxFrac);
+  const [intPart, decPart] = fixed.split('.');
+
+  const withSpaces = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
+
+  if (maxFrac === 0) return withSpaces;
+
+  let frac = decPart ?? '';
+  // Trim trailing zeros down to minFrac
+  while (frac.length > minFrac && frac.endsWith('0')) {
+    frac = frac.slice(0, -1);
+  }
+
+  return frac.length > 0 ? `${withSpaces},${frac}` : withSpaces;
+}
+
 /**
  * Formats a points balance number with thousands separator.
  * Example: 12345 → "12 345"
  */
 export function formatPoints(points: number): string {
-  return new Intl.NumberFormat('ru-RU').format(points);
+  return formatNumberRu(points);
 }
 
 /**
- * Formats a date string or Date object to a localized Russian date.
+ * Formats a date string or Date object to a Russian date.
  * Example: "2026-04-03T10:00:00Z" → "3 апр. 2026"
  */
 export function formatDate(dateStr: string | Date): string {
   const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
-  return date.toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  const day = date.getDate();
+  const month = MONTHS_SHORT[date.getMonth()];
+  const year = date.getFullYear();
+  return `${day} ${month} ${year}`;
 }
 
 /**
  * Formats a date string to a relative time description.
- * Example: "5 minutes ago"
  */
 export function formatRelativeTime(dateStr: string | Date): string {
   const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
@@ -46,10 +70,19 @@ export function formatRelativeTime(dateStr: string | Date): string {
  * Example: 1234.5 → "1 234,50 ₽"
  */
 export function formatCurrency(amount: number, currency = 'RUB'): string {
-  return new Intl.NumberFormat('ru-RU', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(amount);
+  const symbol = currency === 'RUB' ? '\u20BD' : currency;
+  const formatted = formatNumberRu(amount, 0, 2);
+  return `${formatted} ${symbol}`;
+}
+
+/**
+ * Formats a date as "DD.MM.YYYY" (short Russian format).
+ * Example: "2026-04-03T10:00:00Z" → "03.04.2026"
+ */
+export function formatDateShort(dateStr: string | Date): string {
+  const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+  const dd = String(date.getDate()).padStart(2, '0');
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const yyyy = date.getFullYear();
+  return `${dd}.${mm}.${yyyy}`;
 }

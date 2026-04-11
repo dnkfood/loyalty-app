@@ -5,6 +5,7 @@ import { useAuthStore } from '../../src/stores/auth.store';
 import { clearTokens } from '../../src/utils/token';
 import { Card } from '../../src/components/ui/Card';
 import { maskPhone } from '@loyalty/shared-utils';
+import { formatDateShort } from '../../src/utils/format';
 
 export default function ProfileScreen() {
   const logout = useAuthStore((s) => s.logout);
@@ -50,7 +51,7 @@ export default function ProfileScreen() {
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Дата регистрации</Text>
           <Text style={styles.infoValue}>
-            {profile?.createdAt ? new Date(profile.createdAt as string).toLocaleDateString('ru') : '—'}
+            {profile?.createdAt ? formatDateShort(profile.createdAt as string) : '—'}
           </Text>
         </View>
       </Card>

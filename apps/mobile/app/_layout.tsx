@@ -1,3 +1,11 @@
+// Polyfill TextEncoder/TextDecoder for older Android devices
+if (typeof globalThis.TextEncoder === 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const te = require('text-encoding');
+  globalThis.TextEncoder = te.TextEncoder;
+  globalThis.TextDecoder = te.TextDecoder;
+}
+
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity } from 'react-native';
 import { Stack } from 'expo-router';
