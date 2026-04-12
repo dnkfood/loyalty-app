@@ -12,6 +12,7 @@ import { Stack } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import { Component, type ReactNode } from 'react';
+import { usePushNotifications } from '../src/hooks/usePushNotifications';
 
 // ── ErrorBoundary ──
 interface EBProps { children: ReactNode }
@@ -84,6 +85,7 @@ const queryClient = new QueryClient({
 // ── Root layout ──
 function RootLayout() {
   const { ready, authenticated } = useAuthHydration();
+  usePushNotifications();
 
   if (!ready) {
     return (

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "79177265782",
+    "project_id": "loyalty-app-dnk",
+    "storage_bucket": "loyalty-app-dnk.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:79177265782:android:4875adeeaea35695f2a557",
+        "android_client_info": {
+          "package_name": "com.dnkfood.loyalty"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBnSr64q0HgA5CM6_ybEebeNa9RmaAIb-4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
