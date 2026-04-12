@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import type { Redis } from 'ioredis';
 import { renderPushTemplate, type PushTemplateKey } from './templates';
+import { FirebaseAdminService } from './firebase-admin.service';
 
 export interface SendPushOptions {
   userId: string;
@@ -20,6 +21,7 @@ export class PushService {
     private readonly prisma: PrismaService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
     private readonly configService: ConfigService,
+    private readonly firebaseAdmin: FirebaseAdminService,
   ) {}
 
   /**
@@ -149,29 +151,21 @@ export class PushService {
     notification: { title: string; body: string },
     data?: Record<string, string>,
   ): Promise<void> {
-    const serverKey = this.configService.get<string>('app.push.fcm.serverKey', '');
-    if (!serverKey) {
-      this.logger.warn('FCM_SERVER_KEY not configured, skipping push send');
+    const messaging = this.firebaseAdmin.getMessaging();
+    if (!messaging) {
+      this.logger.warn('Firebase Admin not initialized, skipping FCM send');
       return;
     }
 
-    const response = await fetch('https://fcm.googleapis.com/fcm/send', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `key=${serverKey}`,
+    await messaging.send({
+      token,
+      notification: { title: notification.title, body: notification.body },
+      data: data ?? {},
+      android: {
+        priority: 'high',
+        notification: { channelId: 'default' },
       },
-      body: JSON.stringify({
-        to: token,
-        notification: { title: notification.title, body: notification.body },
-        data: data ?? {},
-      }),
     });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`FCM error ${response.status}: ${text}`);
-    }
   }
 
   private async sendApns(

@@ -53,8 +53,8 @@ services:
         value: ""
       - key: ALFA_SMS_PASSWORD
         value: ""
-      - key: FCM_SERVER_KEY
-        value: ""
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false
       - key: APNS_KEY_ID
         value: ""
       - key: APNS_TEAM_ID

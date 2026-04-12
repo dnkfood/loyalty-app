@@ -15,7 +15,11 @@ export default registerAs('app', () => ({
   },
   push: {
     maxPerUserPerDay: parseInt(process.env.PUSH_MAX_PER_USER_PER_DAY ?? '3', 10),
-    fcm: { serverKey: process.env.FCM_SERVER_KEY ?? '' },
+    firebase: {
+      serviceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT ?? '',
+      serviceAccountPath:
+        process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? 'firebase-service-account.json',
+    },
     apns: {
       keyId: process.env.APNS_KEY_ID ?? '',
       teamId: process.env.APNS_TEAM_ID ?? '',
