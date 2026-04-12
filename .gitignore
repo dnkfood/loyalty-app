@@ -10,8 +10,8 @@ node_modules/
 render.env
 
 # Firebase service account (contains private key — inject via env var on Render)
-firebase-service-account.json
-apps/bff/firebase-service-account.json
+*firebase-service-account*.json
+apps/bff/*firebase-service-account*.json
 
 # Build outputs
 dist/

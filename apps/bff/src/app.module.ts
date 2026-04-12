@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'node:path';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -31,6 +33,11 @@ import jwtConfig from './config/jwt.config';
         limit: 100,
       },
     ]),
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', '..', 'admin', 'dist'),
+      serveRoot: '/admin',
+      serveStaticOptions: { fallthrough: true },
+    }),
     PrismaModule,
     RedisModule,
     AuthModule,

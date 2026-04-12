@@ -103,11 +103,13 @@ if errorlevel 1 (
 )
 
 echo.
-echo [STEP 2/5] Build shared packages
+echo [STEP 2/5] Build shared packages + Admin SPA
 call pnpm --filter @loyalty/shared-types build
 if errorlevel 1 ( echo [ERROR] shared-types build failed. & popd & exit /b 1 )
 call pnpm --filter @loyalty/shared-utils build
 if errorlevel 1 ( echo [ERROR] shared-utils build failed. & popd & exit /b 1 )
+call pnpm --filter admin build
+if errorlevel 1 ( echo [ERROR] admin build failed. & popd & exit /b 1 )
 
 echo.
 echo [STEP 3/5] Prisma generate + migrate deploy
