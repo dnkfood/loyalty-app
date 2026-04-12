@@ -36,6 +36,11 @@ import jwtConfig from './config/jwt.config';
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', '..', 'admin', 'dist'),
       serveRoot: '/admin',
+      // Explicit Express 4 wildcard. @nestjs/serve-static@5 defaults to the
+      // Express 5 syntax '{*any}', which silently fails to register a route
+      // under @nestjs/platform-express@10 (Express 4) and breaks the SPA
+      // fallback for deep links like /admin/login.
+      renderPath: '*',
       serveStaticOptions: { fallthrough: true },
     }),
     PrismaModule,
