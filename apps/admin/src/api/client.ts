@@ -21,6 +21,8 @@ apiClient.interceptors.request.use((config) => {
 });
 
 // Response interceptor: handle 401
+const LOGIN_URL = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/login`;
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error: unknown) => {
@@ -29,7 +31,9 @@ apiClient.interceptors.response.use(
       error.response?.status === 401
     ) {
       useAuthStore.getState().logout();
-      window.location.href = '/login';
+      if (window.location.pathname !== LOGIN_URL) {
+        window.location.href = LOGIN_URL;
+      }
     }
     return Promise.reject(error);
   },
