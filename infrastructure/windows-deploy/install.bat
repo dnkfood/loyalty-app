@@ -112,7 +112,7 @@ call pnpm --filter admin build
 if errorlevel 1 ( echo [ERROR] admin build failed. & popd & exit /b 1 )
 
 echo.
-echo [STEP 3/5] Prisma generate + migrate deploy
+echo [STEP 3/5] Prisma generate + migrate deploy + seed
 call pnpm --filter bff exec prisma generate --schema=prisma/schema.prisma
 if errorlevel 1 ( echo [ERROR] prisma generate failed. & popd & exit /b 1 )
 call pnpm --filter bff exec prisma migrate deploy --schema=prisma/schema.prisma
@@ -121,6 +121,11 @@ if errorlevel 1 (
     echo         and confirm the PostgreSQL server is reachable.
     popd
     exit /b 1
+)
+call pnpm --filter bff db:seed
+if errorlevel 1 (
+    echo [WARN] db:seed exited non-zero. Inspect output above; the install
+    echo        will continue but the admin user may be missing.
 )
 
 echo.
