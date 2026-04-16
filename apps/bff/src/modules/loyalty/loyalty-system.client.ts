@@ -233,12 +233,20 @@ export class LoyaltySystemClient {
     name: string,
     birthday: string,
     email?: string,
-  ): Promise<void> {
+  ): Promise<{ code: string }> {
     const cell = this.normalizePhone(phone);
     const params: Record<string, string> = { cell, regionId, name, birthday };
     if (email) params.email = email;
-    const data = await this.get<GateEnvelope<{ code?: string }>>('Register', params);
-    this.assertCode(data.root.result.code);
+
+    this.logger.log(`Register request: cell=${maskPhone(cell)}, regionId=${regionId}, name=${name}, birthday=${birthday}, email=${email ?? '(none)'}`);
+
+    const data = await this.get<GateEnvelope<{ code?: string; command?: string }>>('Register', params);
+    const result = data.root.result;
+
+    this.logger.log(`Register response: code=${result.code}, command=${result.command}, full=${JSON.stringify(result)}`);
+
+    this.assertCode(result.code);
+    return { code: result.code ?? '0' };
   }
 
   /**

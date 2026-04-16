@@ -136,7 +136,7 @@ export class LoyaltyService {
   }
 
   /**
-   * Registers a guest in the loyalty system and syncs data back to local DB.
+   * Registers a guest in the loyalty system, verifies creation, and syncs data back.
    */
   async registerGuest(
     userId: string,
@@ -144,7 +144,7 @@ export class LoyaltyService {
     name: string,
     birthday: string,
     email?: string,
-  ): Promise<{ success: boolean }> {
+  ): Promise<{ success: boolean; cardCode?: string; balance?: number }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { phone: true },
@@ -157,11 +157,20 @@ export class LoyaltyService {
       });
     }
 
-    await this.loyaltyClient.registerGuest(user.phone, regionId, name, birthday, email);
+    this.logger.log(`Registering guest: userId=${userId}, phone=${user.phone}, regionId=${regionId}, name=${name}, birthday=${birthday}`);
 
-    // Sync loyalty data after registration
+    const result = await this.loyaltyClient.registerGuest(user.phone, regionId, name, birthday, email);
+    this.logger.log(`Register result: code=${result.code}`);
+
+    // Verify that the guest was actually created by calling Info
+    let cardCode: string | undefined;
+    let balance: number | undefined;
     try {
       const info = await this.loyaltyClient.getGuestInfo(user.phone);
+      this.logger.log(`Post-registration Info: cardCode=${info.cardCode}, balance=${info.balance}, guestName=${info.guestName}`);
+      cardCode = info.cardCode;
+      balance = info.balance;
+
       await this.prisma.user.update({
         where: { id: userId },
         data: {
@@ -169,10 +178,10 @@ export class LoyaltyService {
           externalGuestId: info.cardCode || undefined,
         },
       });
-    } catch {
-      this.logger.warn(`Failed to sync loyalty data after registration for user ${userId}`);
+    } catch (err) {
+      this.logger.warn(`Post-registration Info failed for user ${userId}: ${(err as Error).message}`);
     }
 
-    return { success: true };
+    return { success: true, cardCode, balance };
   }
 }
