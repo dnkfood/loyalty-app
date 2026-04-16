@@ -41,9 +41,8 @@ export function BalanceCard({
 }: BalanceCardProps) {
   const colors = getLevelColors(statusLevel);
   const hasNextLevel = nextLevelPoints != null && nextLevelPoints > 0;
-  const remaining = hasNextLevel
-    ? Math.max(0, nextLevelPoints - currentSpend)
-    : 0;
+  const totalToNext = hasNextLevel ? currentSpend + nextLevelPoints : 0;
+  const remaining = hasNextLevel ? nextLevelPoints : 0;
 
   return (
     <Card style={{ backgroundColor: colors.bg }} padding={24}>
@@ -72,7 +71,7 @@ export function BalanceCard({
         <View style={styles.progressSection}>
           <ProgressBar
             value={currentSpend}
-            max={nextLevelPoints}
+            max={totalToNext}
             color="#fff"
             trackColor="rgba(255,255,255,0.25)"
           />

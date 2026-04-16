@@ -32,9 +32,10 @@ export interface LoyaltyLevelDto {
 
 export interface LoyaltyHistoryItemDto {
   date: string;
-  summa: number;
-  bonus: number;
-  operation: string;
+  amount: number;
+  description: string;
+  transactionType: string;
+  sign: number;
 }
 
 export interface LoyaltyHistoryDto {
@@ -88,11 +89,13 @@ interface QrCodeResult {
   qr_code?: string;
 }
 
-interface TransactionResult {
-  name?: string;
-  summa?: string;
-  bonus_percent?: string;
+interface HistoryResult {
   command?: string;
+  date_op?: string;
+  summa?: string;
+  name_transaction?: string;
+  id_transaction_type?: string;
+  sign?: string;
 }
 
 @Injectable()
@@ -154,7 +157,7 @@ export class LoyaltySystemClient {
   }
 
   /**
-   * GET /api/Gate/Transaction?cell={cell}&begda={from}&enda={to}
+   * GET /api/Gate/History?cell={cell}&beginDate={from}&endDate={to}
    * Returns transaction history for the given phone within the date range.
    * The result can be a single object or an array of objects.
    */
@@ -165,26 +168,27 @@ export class LoyaltySystemClient {
   ): Promise<LoyaltyHistoryDto> {
     const cell = this.normalizePhone(phone);
     const params: Record<string, string> = { cell };
-    if (from) params.begda = from;
-    if (to) params.enda = to;
+    if (from) params.beginDate = from;
+    if (to) params.endDate = to;
 
-    let data: GateEnvelope<TransactionResult | TransactionResult[]>;
+    let data: GateEnvelope<HistoryResult | HistoryResult[]>;
     try {
-      data = await this.get('Transaction', params);
+      data = await this.get('History', params);
     } catch {
       return { items: [] };
     }
 
     const raw = data.root.result;
-    const rawItems: TransactionResult[] = Array.isArray(raw) ? raw : [raw];
+    const rawItems: HistoryResult[] = Array.isArray(raw) ? raw : [raw];
 
     const items: LoyaltyHistoryItemDto[] = rawItems
       .filter((r) => r.summa !== undefined)
       .map((r) => ({
-        date: r.name ?? '',
-        summa: parseFloat(r.summa ?? '0'),
-        bonus: parseFloat(r.bonus_percent ?? '0'),
-        operation: r.command ?? '',
+        date: r.date_op ?? '',
+        amount: parseFloat(r.summa ?? '0'),
+        description: r.name_transaction ?? '',
+        transactionType: r.id_transaction_type ?? '',
+        sign: parseInt(r.sign ?? '1', 10),
       }));
 
     return { items };

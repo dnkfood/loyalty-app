@@ -53,7 +53,7 @@ export class LoyaltyService {
   }
 
   /**
-   * Gets paginated transaction history for a user.
+   * Gets paginated transaction history for a user from the loyalty API.
    */
   async getTransactions(
     userId: string,
@@ -62,38 +62,42 @@ export class LoyaltyService {
   ): Promise<TransactionListResponse> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { externalGuestId: true },
+      select: { phone: true, externalGuestId: true },
     });
 
-    if (!user?.externalGuestId) {
+    if (!user) {
       throw new NotFoundException({
         code: ErrorCodes.GUEST_NOT_FOUND,
-        message: 'User not linked to loyalty system',
+        message: 'User not found',
       });
     }
 
-    const skip = (page - 1) * limit;
+    // Fetch last 2 years of history from the loyalty system
+    const now = new Date();
+    const twoYearsAgo = new Date(now);
+    twoYearsAgo.setFullYear(now.getFullYear() - 2);
+    const fromDate = twoYearsAgo.toISOString().split('T')[0];
+    const toDate = now.toISOString().split('T')[0];
 
-    const [items, total] = await Promise.all([
-      this.prisma.transactionLog.findMany({
-        where: { externalGuestId: user.externalGuestId },
-        orderBy: { occurredAt: 'desc' },
-        skip,
-        take: limit,
-      }),
-      this.prisma.transactionLog.count({
-        where: { externalGuestId: user.externalGuestId },
-      }),
-    ]);
+    const history = await this.loyaltyClient.getHistory(user.phone, fromDate, toDate);
+
+    // Sort by date descending
+    const sorted = history.items.sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+    );
+
+    const total = sorted.length;
+    const skip = (page - 1) * limit;
+    const pageItems = sorted.slice(skip, skip + limit);
 
     return {
-      items: items.map((t) => ({
-        id: t.id,
-        type: t.type as 'earn' | 'spend' | 'expire' | 'correction',
-        amount: t.amount,
-        newBalance: t.newBalance,
-        description: t.description,
-        occurredAt: t.occurredAt,
+      items: pageItems.map((t, idx) => ({
+        id: `tx-${skip + idx}`,
+        type: t.sign >= 0 ? ('earn' as const) : ('spend' as const),
+        amount: Math.abs(t.amount),
+        newBalance: 0,
+        description: t.description || null,
+        occurredAt: new Date(t.date),
       })),
       total,
       page,

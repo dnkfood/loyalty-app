@@ -25,11 +25,11 @@ function formatNumberRu(value: number, minFrac = 0, maxFrac = 0): string {
 }
 
 /**
- * Formats a points balance number with thousands separator.
- * Example: 12345 → "12 345"
+ * Formats a points balance number with thousands separator and 2 decimal places.
+ * Example: 12345.6 → "12 345,60"
  */
 export function formatPoints(points: number): string {
-  return formatNumberRu(points);
+  return formatNumberRu(points, 2, 2);
 }
 
 /**
