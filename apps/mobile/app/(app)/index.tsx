@@ -7,10 +7,12 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
+import { useQuery } from '@tanstack/react-query';
 import { BalanceCard } from '../../src/components/loyalty/BalanceCard';
 import { Card } from '../../src/components/ui/Card';
 import { useBalance } from '../../src/hooks/useBalance';
 import { useTransactions } from '../../src/hooks/useTransactions';
+import { getLoyaltyCard } from '../../src/api/loyalty.api';
 import { ErrorBoundary } from '../../src/components/ErrorBoundary';
 import { formatPoints, formatRelativeTime } from '../../src/utils/format';
 import type { TransactionItem } from '@loyalty/shared-types';
@@ -18,6 +20,11 @@ import type { TransactionItem } from '@loyalty/shared-types';
 function HomeContent() {
   const balance = useBalance();
   const transactions = useTransactions();
+  const cardQuery = useQuery({
+    queryKey: ['loyalty', 'card'],
+    queryFn: getLoyaltyCard,
+    enabled: !!balance.data,
+  });
 
   const recentItems: TransactionItem[] =
     transactions.data?.pages[0]?.items.slice(0, 3) ?? [];
@@ -26,6 +33,7 @@ function HomeContent() {
   const onRefresh = () => {
     void balance.refetch();
     void transactions.refetch();
+    void cardQuery.refetch();
   };
 
   return (
@@ -67,13 +75,13 @@ function HomeContent() {
               isCached={balance.data.isCached}
             />
 
-            {balance.data.cardCode ? (
+            {cardQuery.data?.qrData ? (
               <Card style={styles.qrCard} padding={20}>
                 <Text style={styles.qrTitle}>Карта лояльности</Text>
                 <View style={styles.qrWrapper}>
-                  <QRCode value={balance.data.cardCode} size={140} />
+                  <QRCode value={cardQuery.data.qrData} size={140} />
                 </View>
-                <Text style={styles.qrCardCode}>{balance.data.cardCode}</Text>
+                <Text style={styles.qrCardCode}>{cardQuery.data.qrData}</Text>
               </Card>
             ) : null}
 

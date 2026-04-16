@@ -106,7 +106,7 @@ export class LoyaltyService {
   }
 
   /**
-   * Gets QR card data for a user.
+   * Gets dynamic QR card code from the loyalty system's SmsCode endpoint.
    */
   async getCard(userId: string): Promise<LoyaltyCardResponse> {
     const user = await this.prisma.user.findUnique({
@@ -121,23 +121,16 @@ export class LoyaltyService {
       });
     }
 
-    // Get card code from loyalty system (used for QR scanning at POS)
-    let cardCode = user.externalGuestId ?? '';
+    const cardCode = user.externalGuestId ?? '';
+    let smsCode = '';
     try {
-      const info = await this.loyaltyClient.getGuestInfo(user.phone);
-      cardCode = info.cardCode || cardCode;
+      smsCode = await this.loyaltyClient.getCardCode(user.phone);
     } catch {
-      // Use cached externalGuestId if loyalty system is down
+      this.logger.warn(`Failed to get dynamic card code for user ${userId}`);
     }
 
-    const qrData = JSON.stringify({
-      type: 'loyalty_card',
-      cardCode,
-      ts: Date.now(),
-    });
-
     return {
-      qrData,
+      qrData: smsCode,
       externalGuestId: cardCode,
     };
   }

@@ -146,6 +146,18 @@ export class LoyaltySystemClient {
   }
 
   /**
+   * GET /api/Gate/SmsCode?cell={cell}
+   * Returns the dynamic sms_code for QR display (same endpoint as sendSmsCode
+   * but we extract the code from the response).
+   */
+  async getCardCode(phone: string): Promise<string> {
+    const cell = this.normalizePhone(phone);
+    const data = await this.get<GateEnvelope<SmsCodeResult>>('SmsCode', { cell });
+    this.assertCode(data.root.result.code);
+    return data.root.result.sms_code ?? '';
+  }
+
+  /**
    * GET /api/Gate/QrCode?cell={cell}
    * Returns QR code data for the guest.
    */
