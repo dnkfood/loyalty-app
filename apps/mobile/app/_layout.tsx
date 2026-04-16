@@ -7,15 +7,23 @@ if (typeof globalThis.TextEncoder === 'undefined') {
 }
 
 import { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity, AppState, type AppStateStatus } from 'react-native';
 import { Stack } from 'expo-router';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import { Component, type ReactNode } from 'react';
 import { usePushNotifications } from '../src/hooks/usePushNotifications';
 import { useAuthStore } from '../src/stores/auth.store';
 import { getRefreshToken, saveTokens, clearTokens } from '../src/utils/token';
 import axios from 'axios';
+
+// Wire React Query focusManager to AppState so queries refetch when app returns to foreground
+focusManager.setEventListener((handleFocus) => {
+  const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
+    handleFocus(state === 'active');
+  });
+  return () => sub.remove();
+});
 
 const BASE_URL =
   (process.env.EXPO_PUBLIC_BFF_URL as string | undefined) ?? 'http://45.84.87.169:3000/api/v1';
