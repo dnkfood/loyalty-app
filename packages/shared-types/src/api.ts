@@ -67,6 +67,7 @@ export interface VerifyOtpResponse {
     phone: string;
     name?: string | null;
   };
+  isNewUser: boolean;
 }
 
 export interface RefreshTokenRequest {

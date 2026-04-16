@@ -9,7 +9,7 @@ import {
   Alert,
   TouchableOpacity,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, router } from 'expo-router';
 import { Button } from '../../src/components/ui/Button';
 import { verifyOtp } from '../../src/api/auth.api';
 import { sendOtp } from '../../src/api/auth.api';
@@ -75,6 +75,10 @@ export default function VerifyScreen() {
       const result = await verifyOtp(phone ?? '', code);
       await saveTokens(result.accessToken, result.refreshToken);
       setAuth(result.accessToken, { ...result.user, name: result.user.name ?? null });
+      if (result.isNewUser) {
+        router.replace('/(auth)/register' as never);
+        return;
+      }
     } catch {
       Alert.alert('Ошибка', 'Неверный или истёкший код. Попробуйте снова.');
       setCode('');

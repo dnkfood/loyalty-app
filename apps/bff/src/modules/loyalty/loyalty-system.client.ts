@@ -206,6 +206,55 @@ export class LoyaltySystemClient {
     return { items };
   }
 
+  /**
+   * GET /api/Gate/Region
+   * Returns the list of available regions/cities.
+   */
+  async getRegions(): Promise<{ id: string; name: string }[]> {
+    const data = await this.get<GateEnvelope<{ id?: string; name?: string; code?: string }[]>>(
+      'Region',
+      {},
+    );
+    const raw = data.root.result;
+    const items = Array.isArray(raw) ? raw : [raw];
+    return items
+      .filter((r) => r.id != null)
+      .map((r) => ({ id: r.id!, name: r.name ?? '' }));
+  }
+
+  /**
+   * GET /api/Gate/Register?cell={cell}&regionId={id}&email={email}&name={name}&birthday={date}
+   * Registers a new guest in the loyalty system.
+   * Birthday format: DD.MM.YYYY
+   */
+  async registerGuest(
+    phone: string,
+    regionId: string,
+    name: string,
+    birthday: string,
+    email?: string,
+  ): Promise<void> {
+    const cell = this.normalizePhone(phone);
+    const params: Record<string, string> = { cell, regionId, name, birthday };
+    if (email) params.email = email;
+    const data = await this.get<GateEnvelope<{ code?: string }>>('Register', params);
+    this.assertCode(data.root.result.code);
+  }
+
+  /**
+   * Checks if a guest exists in the loyalty system.
+   * Returns true if found, false if code="-1".
+   */
+  async guestExists(phone: string): Promise<boolean> {
+    try {
+      await this.getGuestInfo(phone);
+      return true;
+    } catch (err) {
+      if (err instanceof NotFoundException) return false;
+      throw err;
+    }
+  }
+
   // --- Internal helpers ---
 
   /**

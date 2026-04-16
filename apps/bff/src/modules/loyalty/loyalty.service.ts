@@ -134,4 +134,45 @@ export class LoyaltyService {
       externalGuestId: cardCode,
     };
   }
+
+  /**
+   * Registers a guest in the loyalty system and syncs data back to local DB.
+   */
+  async registerGuest(
+    userId: string,
+    regionId: string,
+    name: string,
+    birthday: string,
+    email?: string,
+  ): Promise<{ success: boolean }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { phone: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException({
+        code: ErrorCodes.GUEST_NOT_FOUND,
+        message: 'User not found',
+      });
+    }
+
+    await this.loyaltyClient.registerGuest(user.phone, regionId, name, birthday, email);
+
+    // Sync loyalty data after registration
+    try {
+      const info = await this.loyaltyClient.getGuestInfo(user.phone);
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          name,
+          externalGuestId: info.cardCode || undefined,
+        },
+      });
+    } catch {
+      this.logger.warn(`Failed to sync loyalty data after registration for user ${userId}`);
+    }
+
+    return { success: true };
+  }
 }

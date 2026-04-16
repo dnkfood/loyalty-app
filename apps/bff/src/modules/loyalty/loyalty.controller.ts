@@ -1,6 +1,8 @@
 import {
   Controller,
   Get,
+  Post,
+  Body,
   Query,
   UseGuards,
   ParseIntPipe,
@@ -8,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { LoyaltyService } from './loyalty.service';
+import { LoyaltySystemClient } from './loyalty-system.client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/strategies/jwt.strategy';
@@ -17,7 +20,10 @@ import type { JwtPayload } from '../auth/strategies/jwt.strategy';
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class LoyaltyController {
-  constructor(private readonly loyaltyService: LoyaltyService) {}
+  constructor(
+    private readonly loyaltyService: LoyaltyService,
+    private readonly loyaltyClient: LoyaltySystemClient,
+  ) {}
 
   @Get('balance')
   @ApiOperation({ summary: 'Get loyalty balance and status' })
@@ -41,5 +47,20 @@ export class LoyaltyController {
   @ApiOperation({ summary: 'Get loyalty QR card data' })
   async getCard(@CurrentUser() user: JwtPayload) {
     return this.loyaltyService.getCard(user.sub);
+  }
+
+  @Get('regions')
+  @ApiOperation({ summary: 'Get list of available regions/cities' })
+  async getRegions() {
+    return this.loyaltyClient.getRegions();
+  }
+
+  @Post('register')
+  @ApiOperation({ summary: 'Register guest in loyalty system' })
+  async registerGuest(
+    @CurrentUser() user: JwtPayload,
+    @Body() body: { regionId: string; name: string; birthday: string; email?: string },
+  ) {
+    return this.loyaltyService.registerGuest(user.sub, body.regionId, body.name, body.birthday, body.email);
   }
 }

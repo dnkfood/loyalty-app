@@ -7,6 +7,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  TouchableOpacity,
+  Linking,
+  ScrollView,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Button } from '../../src/components/ui/Button';
@@ -29,9 +32,12 @@ function extractDigits(masked: string): string {
 export default function PhoneScreen() {
   const [display, setDisplay] = useState('');
   const [loading, setLoading] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [adsAccepted, setAdsAccepted] = useState(false);
 
   const digits = extractDigits(display);
   const fullPhone = `7${digits}`;
+  const canSubmit = digits.length >= 10 && privacyAccepted;
 
   const handleChangeText = (text: string) => {
     setDisplay(applyPhoneMask(text));
@@ -59,7 +65,7 @@ export default function PhoneScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Loyalty App</Text>
         <Text style={styles.subtitle}>Введите номер телефона для входа</Text>
 
@@ -76,13 +82,45 @@ export default function PhoneScreen() {
           />
         </View>
 
+        <TouchableOpacity
+          style={styles.checkboxRow}
+          onPress={() => setPrivacyAccepted(!privacyAccepted)}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.checkbox, privacyAccepted && styles.checkboxChecked]}>
+            {privacyAccepted && <Text style={styles.checkmark}>✓</Text>}
+          </View>
+          <Text style={styles.checkboxLabel}>
+            Я согласен с{' '}
+            <Text
+              style={styles.link}
+              onPress={() => void Linking.openURL('https://dnkfood.ru/privacy')}
+            >
+              политикой обработки персональных данных
+            </Text>
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.checkboxRow}
+          onPress={() => setAdsAccepted(!adsAccepted)}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.checkbox, adsAccepted && styles.checkboxChecked]}>
+            {adsAccepted && <Text style={styles.checkmark}>✓</Text>}
+          </View>
+          <Text style={styles.checkboxLabel}>
+            Я согласен на получение рекламных рассылок
+          </Text>
+        </TouchableOpacity>
+
         <Button
           title="Получить код"
           onPress={() => void handleSendOtp()}
           loading={loading}
-          disabled={digits.length < 10}
+          disabled={!canSubmit}
         />
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -93,7 +131,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     padding: 24,
     justifyContent: 'center',
   },
@@ -132,5 +170,41 @@ const styles = StyleSheet.create({
     height: 52,
     fontSize: 18,
     paddingHorizontal: 8,
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+    paddingRight: 8,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderWidth: 2,
+    borderColor: '#ccc',
+    borderRadius: 4,
+    marginRight: 10,
+    marginTop: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  checkmark: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  checkboxLabel: {
+    flex: 1,
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+  },
+  link: {
+    color: '#007AFF',
+    textDecorationLine: 'underline',
   },
 });

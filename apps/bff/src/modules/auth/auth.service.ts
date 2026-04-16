@@ -101,7 +101,7 @@ export class AuthService {
   async verifyOtp(
     dto: VerifyOtpDto,
     ipAddress?: string,
-  ): Promise<{ accessToken: string; refreshToken: string; user: { id: string; phone: string; name: string | null } }> {
+  ): Promise<{ accessToken: string; refreshToken: string; user: { id: string; phone: string; name: string | null }; isNewUser: boolean }> {
     const { phone, code, deviceId } = dto;
 
     // Check our DB for rate limiting
@@ -155,18 +155,23 @@ export class AuthService {
       user = await this.prisma.user.create({ data: { phone } });
     }
 
-    // Sync loyalty data: update externalGuestId and name from loyalty system
+    // Check if guest exists in loyalty system
+    let isNewUser = false;
     try {
-      const guestInfo = await this.loyaltyClient.getGuestInfo(phone);
-      if (guestInfo.cardCode) {
-        await this.prisma.user.update({
-          where: { id: user.id },
-          data: {
-            externalGuestId: guestInfo.cardCode,
-            name: user.name || guestInfo.guestName,
-          },
-        });
-        user = await this.prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+      const exists = await this.loyaltyClient.guestExists(phone);
+      isNewUser = !exists;
+      if (exists) {
+        const guestInfo = await this.loyaltyClient.getGuestInfo(phone);
+        if (guestInfo.cardCode) {
+          await this.prisma.user.update({
+            where: { id: user.id },
+            data: {
+              externalGuestId: guestInfo.cardCode,
+              name: user.name || guestInfo.guestName,
+            },
+          });
+          user = await this.prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+        }
       }
     } catch (err) {
       this.logger.warn(`Failed to sync loyalty data on login: ${(err as Error).message}`);
@@ -181,6 +186,7 @@ export class AuthService {
       accessToken,
       refreshToken,
       user: { id: user.id, phone: user.phone, name: user.name },
+      isNewUser,
     };
   }
 
