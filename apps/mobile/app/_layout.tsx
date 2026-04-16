@@ -6,13 +6,19 @@ if (typeof globalThis.TextEncoder === 'undefined') {
   globalThis.TextDecoder = te.TextDecoder;
 }
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity } from 'react-native';
 import { Stack } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import { Component, type ReactNode } from 'react';
 import { usePushNotifications } from '../src/hooks/usePushNotifications';
+import { useAuthStore } from '../src/stores/auth.store';
+import { getRefreshToken, saveTokens, clearTokens } from '../src/utils/token';
+import axios from 'axios';
+
+const BASE_URL =
+  (process.env.EXPO_PUBLIC_BFF_URL as string | undefined) ?? 'http://45.84.87.169:3000/api/v1';
 
 // ── ErrorBoundary ──
 interface EBProps { children: ReactNode }
@@ -40,38 +46,90 @@ class AppErrorBoundary extends Component<EBProps, EBState> {
   }
 }
 
-// ── Auth hydration hook ──
-function useAuthHydration() {
+// ── Auth session restore hook ──
+function useAuthSession() {
   const [state, setState] = useState({ ready: false, authenticated: false });
+  const didRun = useRef(false);
 
   useEffect(() => {
+    if (didRun.current) return;
+    didRun.current = true;
+
     let cancelled = false;
-    (async () => {
+
+    async function waitForHydration(): Promise<void> {
+      if (useAuthStore.persist.hasHydrated()) return;
+      return new Promise((resolve) => {
+        useAuthStore.persist.onFinishHydration(() => resolve());
+      });
+    }
+
+    async function restore() {
       try {
-        // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-        const { useAuthStore } = require('../src/stores/auth.store') as typeof import('../src/stores/auth.store');
-        const check = () => {
-          if (!cancelled) {
-            setState({ ready: true, authenticated: useAuthStore.getState().isAuthenticated });
-          }
-        };
-        if (useAuthStore.persist.hasHydrated()) {
-          check();
+        await waitForHydration();
+
+        // Check if we have a refresh token in SecureStore
+        const refreshToken = await getRefreshToken();
+
+        if (!refreshToken) {
+          // No refresh token — user never logged in or explicitly logged out
+          if (!cancelled) setState({ ready: true, authenticated: false });
+          return;
         }
-        useAuthStore.persist.onFinishHydration(check);
-        useAuthStore.subscribe(() => {
-          if (!cancelled) {
-            setState({ ready: true, authenticated: useAuthStore.getState().isAuthenticated });
+
+        // We have a refresh token — try to get a fresh access token
+        try {
+          const { data } = await axios.post<{
+            data: { accessToken: string; refreshToken: string };
+          }>(`${BASE_URL}/auth/refresh`, { refreshToken }, { timeout: 10_000 });
+
+          const { accessToken, refreshToken: newRefreshToken } = data.data;
+
+          await saveTokens(accessToken, newRefreshToken);
+
+          // Restore user from Zustand store (persisted in AsyncStorage)
+          const storedUser = useAuthStore.getState().user;
+          if (storedUser) {
+            useAuthStore.getState().setAuth(accessToken, storedUser);
           }
-        });
-        // Timeout fallback
-        setTimeout(() => { if (!cancelled && !state.ready) setState({ ready: true, authenticated: false }); }, 3000);
+
+          if (!cancelled) setState({ ready: true, authenticated: true });
+        } catch (refreshErr) {
+          // If server explicitly rejected (401/403) — session is dead
+          if (
+            axios.isAxiosError(refreshErr) &&
+            refreshErr.response &&
+            (refreshErr.response.status === 401 || refreshErr.response.status === 403)
+          ) {
+            await clearTokens();
+            useAuthStore.getState().logout();
+            if (!cancelled) setState({ ready: true, authenticated: false });
+          } else {
+            // Network error / timeout — stay authenticated optimistically
+            // using cached auth from Zustand (accessToken might still work)
+            const wasAuthenticated = useAuthStore.getState().isAuthenticated;
+            if (!cancelled) setState({ ready: true, authenticated: wasAuthenticated });
+          }
+        }
       } catch (err) {
-        console.error('[AuthInit]', err);
+        console.error('[AuthSession] restore failed:', err);
         if (!cancelled) setState({ ready: true, authenticated: false });
       }
-    })();
+    }
+
+    void restore();
     return () => { cancelled = true; };
+  }, []);
+
+  // Also track live auth state changes (login/logout during session)
+  useEffect(() => {
+    const unsub = useAuthStore.subscribe((s) => {
+      setState((prev) => {
+        if (!prev.ready) return prev;
+        return { ready: true, authenticated: s.isAuthenticated };
+      });
+    });
+    return unsub;
   }, []);
 
   return state;
@@ -84,7 +142,7 @@ const queryClient = new QueryClient({
 
 // ── Root layout ──
 function RootLayout() {
-  const { ready, authenticated } = useAuthHydration();
+  const { ready, authenticated } = useAuthSession();
   usePushNotifications();
 
   if (!ready) {
