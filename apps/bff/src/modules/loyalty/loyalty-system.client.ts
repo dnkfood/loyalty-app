@@ -289,20 +289,24 @@ export class LoyaltySystemClient {
 
   /**
    * Makes a GET request to /api/Gate/{command}?{params}
+   * Uses URL.searchParams to ensure proper UTF-8 encoding of Cyrillic and special chars.
    */
   private async get<T>(
     command: string,
     params: Record<string, string>,
   ): Promise<T> {
-    const qs = new URLSearchParams(params).toString();
-    const url = `${this.baseUrl}/api/Gate/${command}?${qs}`;
+    const url = new URL(`/api/Gate/${command}`, this.baseUrl);
+    for (const [key, value] of Object.entries(params)) {
+      url.searchParams.set(key, value);
+    }
+    const urlString = url.toString();
     this.logger.debug(
-      `Loyalty API: GET ${url.replace(/cell=\d+/, `cell=${maskPhone(params.cell ?? '')}`)}`,
+      `Loyalty API: GET ${urlString.replace(/cell=\d+/, `cell=${maskPhone(params.cell ?? '')}`)}`,
     );
 
     let response: Response;
     try {
-      response = await fetch(url, {
+      response = await fetch(urlString, {
         method: 'GET',
         signal: AbortSignal.timeout(10_000),
       });
