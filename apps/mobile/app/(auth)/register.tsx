@@ -11,6 +11,7 @@ import {
 import { router } from 'expo-router';
 import { Button } from '../../src/components/ui/Button';
 import { apiClient } from '../../src/api/client';
+import { useAuthStore } from '../../src/stores/auth.store';
 import type { ApiSuccessResponse } from '@loyalty/shared-types';
 
 interface Region {
@@ -61,7 +62,9 @@ export default function RegisterScreen() {
         regionId: selectedRegion.id,
         email: email.trim() || undefined,
       });
-      router.replace('/(app)');
+      // Clear registration flag so root layout lets user into (app)
+      useAuthStore.getState().setNeedsRegistration(false);
+      router.replace('/(app)' as never);
     } catch {
       Alert.alert('Ошибка', 'Не удалось зарегистрироваться. Попробуйте позже.');
     } finally {

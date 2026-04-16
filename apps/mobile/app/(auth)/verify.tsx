@@ -73,12 +73,16 @@ export default function VerifyScreen() {
     try {
       setLoading(true);
       const result = await verifyOtp(phone ?? '', code);
+      console.log('[Verify] isNewUser:', result.isNewUser);
       await saveTokens(result.accessToken, result.refreshToken);
-      setAuth(result.accessToken, { ...result.user, name: result.user.name ?? null });
       if (result.isNewUser) {
+        // Set needsRegistration BEFORE setAuth so root layout keeps user in (auth) stack
+        useAuthStore.getState().setNeedsRegistration(true);
+        setAuth(result.accessToken, { ...result.user, name: result.user.name ?? null });
         router.replace('/(auth)/register' as never);
         return;
       }
+      setAuth(result.accessToken, { ...result.user, name: result.user.name ?? null });
     } catch {
       Alert.alert('Ошибка', 'Неверный или истёкший код. Попробуйте снова.');
       setCode('');

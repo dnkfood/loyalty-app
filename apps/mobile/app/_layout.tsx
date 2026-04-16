@@ -101,7 +101,8 @@ function useAuthSession() {
             useAuthStore.getState().setAuth(accessToken, storedUser);
           }
 
-          if (!cancelled) setState({ ready: true, authenticated: true });
+          const needsReg = useAuthStore.getState().needsRegistration;
+          if (!cancelled) setState({ ready: true, authenticated: !needsReg });
         } catch (refreshErr) {
           // If server explicitly rejected (401/403) — session is dead
           if (
@@ -130,11 +131,13 @@ function useAuthSession() {
   }, []);
 
   // Also track live auth state changes (login/logout during session)
+  // needsRegistration keeps user in (auth) stack until registration completes
   useEffect(() => {
     const unsub = useAuthStore.subscribe((s) => {
       setState((prev) => {
         if (!prev.ready) return prev;
-        return { ready: true, authenticated: s.isAuthenticated };
+        const authed = s.isAuthenticated && !s.needsRegistration;
+        return { ready: true, authenticated: authed };
       });
     });
     return unsub;

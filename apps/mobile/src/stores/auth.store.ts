@@ -12,8 +12,10 @@ interface AuthState {
   accessToken: string | null;
   user: AuthUser | null;
   isAuthenticated: boolean;
+  needsRegistration: boolean;
   _hasHydrated: boolean;
   setAuth: (accessToken: string, user: AuthUser) => void;
+  setNeedsRegistration: (value: boolean) => void;
   logout: () => void;
 }
 
@@ -49,13 +51,17 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       user: null,
       isAuthenticated: false,
+      needsRegistration: false,
       _hasHydrated: false,
 
       setAuth: (accessToken, user) =>
         set({ accessToken, user, isAuthenticated: true }),
 
+      setNeedsRegistration: (value) =>
+        set({ needsRegistration: value }),
+
       logout: () =>
-        set({ accessToken: null, user: null, isAuthenticated: false }),
+        set({ accessToken: null, user: null, isAuthenticated: false, needsRegistration: false }),
     }),
     {
       name: 'auth-storage',
@@ -64,6 +70,7 @@ export const useAuthStore = create<AuthState>()(
         accessToken: state.accessToken,
         user: state.user,
         isAuthenticated: state.isAuthenticated,
+        needsRegistration: state.needsRegistration,
       }),
     },
   ),
