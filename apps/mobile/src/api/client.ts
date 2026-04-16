@@ -64,7 +64,12 @@ apiClient.interceptors.response.use(
 
       try {
         const refreshToken = await SecureStore.getItemAsync('refresh_token');
-        if (!refreshToken) throw new Error('No refresh token');
+        if (!refreshToken) {
+          // No refresh token stored — genuine auth loss, logout
+          processQueue(new Error('No refresh token'), null);
+          useAuthStore.getState().logout();
+          return Promise.reject(error);
+        }
 
         const { data } = await axios.post<{
           data: { accessToken: string; refreshToken: string };
@@ -83,7 +88,15 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        useAuthStore.getState().logout();
+        // Only logout if the server explicitly rejected the refresh token (401/403).
+        // Network errors or timeouts should NOT force logout.
+        if (
+          axios.isAxiosError(refreshError) &&
+          refreshError.response &&
+          (refreshError.response.status === 401 || refreshError.response.status === 403)
+        ) {
+          useAuthStore.getState().logout();
+        }
         throw refreshError;
       } finally {
         isRefreshing = false;

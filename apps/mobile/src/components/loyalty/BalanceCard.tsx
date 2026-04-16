@@ -12,7 +12,6 @@ interface BalanceCardProps {
   bonusPercent: number;
   currentSpend: number;
   nextLevelPoints?: number | null;
-  isCached?: boolean;
 }
 
 /**
@@ -37,7 +36,6 @@ export function BalanceCard({
   bonusPercent,
   currentSpend,
   nextLevelPoints,
-  isCached = false,
 }: BalanceCardProps) {
   const colors = getLevelColors(statusLevel);
   const hasNextLevel = nextLevelPoints != null && nextLevelPoints > 0;
@@ -46,14 +44,9 @@ export function BalanceCard({
 
   return (
     <Card style={{ backgroundColor: colors.bg }} padding={24}>
-      <View style={styles.header}>
-        <Text style={styles.greeting}>
-          {guestName ? `Привет, ${guestName}` : 'Привет!'}
-        </Text>
-        {isCached && (
-          <Badge label="Кэш" color="#856404" backgroundColor="#fff3cd" />
-        )}
-      </View>
+      <Text style={styles.greeting}>
+        {guestName ? `Привет, ${guestName}` : 'Привет!'}
+      </Text>
 
       <Text style={styles.label}>Баланс баллов</Text>
       <Text style={styles.balance}>{formatPoints(balance)}</Text>
@@ -90,17 +83,11 @@ export function BalanceCard({
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
   greeting: {
     fontSize: 16,
     color: 'rgba(255,255,255,0.9)',
     fontWeight: '600',
-    flex: 1,
+    marginBottom: 16,
   },
   label: {
     fontSize: 13,

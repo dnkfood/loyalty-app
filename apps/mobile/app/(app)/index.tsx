@@ -5,11 +5,14 @@ import {
   View,
   Text,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { BalanceCard } from '../../src/components/loyalty/BalanceCard';
 import { Card } from '../../src/components/ui/Card';
 import { useBalance } from '../../src/hooks/useBalance';
 import { useTransactions } from '../../src/hooks/useTransactions';
+import { useAuthStore } from '../../src/stores/auth.store';
+import { clearTokens } from '../../src/utils/token';
 import { ErrorBoundary } from '../../src/components/ErrorBoundary';
 import { formatPoints, formatRelativeTime, mapTransactionLabel } from '../../src/utils/format';
 import type { TransactionItem } from '@loyalty/shared-types';
@@ -17,6 +20,21 @@ import type { TransactionItem } from '@loyalty/shared-types';
 function HomeContent() {
   const balance = useBalance();
   const transactions = useTransactions();
+  const logout = useAuthStore((s) => s.logout);
+
+  const handleLogout = () => {
+    Alert.alert('Выход', 'Вы уверены, что хотите выйти?', [
+      { text: 'Отмена', style: 'cancel' },
+      {
+        text: 'Выйти',
+        style: 'destructive',
+        onPress: async () => {
+          await clearTokens();
+          logout();
+        },
+      },
+    ]);
+  };
 
   const recentItems: TransactionItem[] =
     transactions.data?.pages[0]?.items.slice(0, 3) ?? [];
@@ -63,7 +81,6 @@ function HomeContent() {
               bonusPercent={balance.data.bonusPercent}
               currentSpend={balance.data.currentSpend}
               nextLevelPoints={balance.data.nextLevelPoints ?? undefined}
-              isCached={balance.data.isCached}
             />
 
             <Card style={styles.txCard} padding={20}>
@@ -102,6 +119,10 @@ function HomeContent() {
                 ))
               )}
             </Card>
+
+            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+              <Text style={styles.logoutText}>Выйти</Text>
+            </TouchableOpacity>
           </>
         )}
       </View>
@@ -216,5 +237,16 @@ const styles = StyleSheet.create({
   },
   txAmountNegative: {
     color: '#ff3b30',
+  },
+  logoutButton: {
+    backgroundColor: '#ff3b30',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  logoutText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
