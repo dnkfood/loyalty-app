@@ -11,7 +11,7 @@ import { Card } from '../../src/components/ui/Card';
 import { useBalance } from '../../src/hooks/useBalance';
 import { useTransactions } from '../../src/hooks/useTransactions';
 import { ErrorBoundary } from '../../src/components/ErrorBoundary';
-import { formatPoints, formatRelativeTime } from '../../src/utils/format';
+import { formatPoints, formatRelativeTime, mapTransactionLabel } from '../../src/utils/format';
 import type { TransactionItem } from '@loyalty/shared-types';
 
 function HomeContent() {
@@ -81,7 +81,7 @@ function HomeContent() {
                   >
                     <View style={styles.txMain}>
                       <Text style={styles.txDescription} numberOfLines={1}>
-                        {item.description ?? txTypeLabel(item.type)}
+                        {mapTransactionLabel(item.description) || txTypeLabel(item.type)}
                       </Text>
                       <Text style={styles.txDate}>
                         {formatRelativeTime(item.occurredAt)}

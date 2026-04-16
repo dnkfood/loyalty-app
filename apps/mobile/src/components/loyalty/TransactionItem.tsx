@@ -1,46 +1,47 @@
 import { View, Text, StyleSheet } from 'react-native';
 import type { TransactionItem as TransactionItemType } from '@loyalty/shared-types';
-import { formatDate, formatPoints } from '../../utils/format';
+import { formatDate, formatPoints, mapTransactionLabel } from '../../utils/format';
 
 interface TransactionItemProps {
   transaction: TransactionItemType;
 }
 
-const typeConfig = {
-  earn: { label: 'Начисление', color: '#34c759', sign: '+' },
-  spend: { label: 'Списание', color: '#ff3b30', sign: '-' },
-  expire: { label: 'Сгорание', color: '#ff9500', sign: '-' },
-  correction: { label: 'Корректировка', color: '#8e8e93', sign: '±' },
+const typeColors = {
+  earn: '#34c759',
+  spend: '#ff3b30',
+  expire: '#ff9500',
+  correction: '#8e8e93',
+} as const;
+
+const typeSigns = {
+  earn: '+',
+  spend: '-',
+  expire: '-',
+  correction: '±',
 } as const;
 
 export function TransactionItem({ transaction }: TransactionItemProps) {
-  const config = typeConfig[transaction.type];
+  const color = typeColors[transaction.type];
+  const sign = typeSigns[transaction.type];
+  const label = mapTransactionLabel(transaction.description);
 
   return (
     <View style={styles.container}>
       <View style={styles.iconContainer}>
-        <View style={[styles.icon, { backgroundColor: config.color + '20' }]}>
-          <Text style={[styles.iconText, { color: config.color }]}>
-            {config.sign}
-          </Text>
+        <View style={[styles.icon, { backgroundColor: color + '20' }]}>
+          <Text style={[styles.iconText, { color }]}>{sign}</Text>
         </View>
       </View>
 
       <View style={styles.details}>
-        <Text style={styles.type}>{config.label}</Text>
-        {transaction.description && (
-          <Text style={styles.description} numberOfLines={1}>
-            {transaction.description}
-          </Text>
-        )}
+        <Text style={styles.type}>{label}</Text>
         <Text style={styles.date}>{formatDate(transaction.occurredAt.toString())}</Text>
       </View>
 
       <View style={styles.amount}>
-        <Text style={[styles.amountText, { color: config.color }]}>
-          {config.sign}{formatPoints(Math.abs(transaction.amount))}
+        <Text style={[styles.amountText, { color }]}>
+          {sign}{formatPoints(Math.abs(transaction.amount))}
         </Text>
-        <Text style={styles.balance}>{formatPoints(transaction.newBalance)} ост.</Text>
       </View>
     </View>
   );
@@ -82,11 +83,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1a1a1a',
   },
-  description: {
-    fontSize: 13,
-    color: '#666',
-    marginTop: 2,
-  },
   date: {
     fontSize: 12,
     color: '#999',
@@ -98,10 +94,5 @@ const styles = StyleSheet.create({
   amountText: {
     fontSize: 16,
     fontWeight: '700',
-  },
-  balance: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 2,
   },
 });

@@ -76,6 +76,32 @@ export function formatCurrency(amount: number, currency = 'RUB'): string {
 }
 
 /**
+ * Maps raw transaction description from the loyalty API to a display label.
+ */
+export function mapTransactionLabel(raw: string | null | undefined): string {
+  if (!raw) return '';
+  const lower = raw.toLowerCase();
+  if (lower.includes('оплата наличн') || lower.includes('оплата карт')) {
+    return 'Сумма чека';
+  }
+  if (
+    lower.includes('внесение') ||
+    lower.includes('начисление') ||
+    lower.includes('бонус') && lower.includes('начисл')
+  ) {
+    return 'Начисление';
+  }
+  if (
+    lower.includes('снятие') ||
+    lower.includes('оплата бонус') ||
+    lower.includes('списан')
+  ) {
+    return 'Списание';
+  }
+  return raw;
+}
+
+/**
  * Formats a date as "DD.MM.YYYY" (short Russian format).
  * Example: "2026-04-03T10:00:00Z" → "03.04.2026"
  */
