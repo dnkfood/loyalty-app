@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-type IoniconsName = 'home' | 'home-outline' | 'list' | 'list-outline' | 'qr-code' | 'qr-code-outline' | 'pricetag' | 'pricetag-outline' | 'person' | 'person-outline';
+type IoniconsName = 'home' | 'home-outline' | 'list' | 'list-outline' | 'qr-code' | 'qr-code-outline' | 'notifications' | 'notifications-outline' | 'person' | 'person-outline';
 
 interface TabIconProps {
   name: IoniconsName;
@@ -15,6 +15,7 @@ function TabIcon({ name, focused }: TabIconProps) {
 export default function AppTabLayout() {
   return (
     <Tabs
+      initialRouteName="card"
       screenOptions={{
         tabBarActiveTintColor: '#007AFF',
         tabBarInactiveTintColor: '#8E8E93',
@@ -24,8 +25,8 @@ export default function AppTabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Главная',
-          tabBarIcon: ({ focused }) => <TabIcon name="home" focused={focused} />,
+          title: 'Профиль',
+          tabBarIcon: ({ focused }) => <TabIcon name="person" focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -45,15 +46,14 @@ export default function AppTabLayout() {
       <Tabs.Screen
         name="offers"
         options={{
-          title: 'Предложения',
-          tabBarIcon: ({ focused }) => <TabIcon name="pricetag" focused={focused} />,
+          title: 'Уведомления',
+          tabBarIcon: ({ focused }) => <TabIcon name="notifications" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Профиль',
-          tabBarIcon: ({ focused }) => <TabIcon name="person" focused={focused} />,
+          href: null,
         }}
       />
     </Tabs>

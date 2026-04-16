@@ -1,39 +1,58 @@
-import { FlatList, StyleSheet, View, Text, Image, RefreshControl } from 'react-native';
+import { FlatList, StyleSheet, View, Text, RefreshControl } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
-import { getOffers } from '../../src/api/loyalty.api';
-import { Card } from '../../src/components/ui/Card';
-import { Badge } from '../../src/components/ui/Badge';
-import { formatDate } from '../../src/utils/format';
+import { apiClient } from '../../src/api/client';
+import { formatRelativeTime } from '../../src/utils/format';
+import type { ApiSuccessResponse } from '@loyalty/shared-types';
 
-export default function OffersScreen() {
-  const { data: offers, isLoading, isError, refetch, isRefetching } = useQuery({
-    queryKey: ['offers'],
-    queryFn: getOffers,
+interface Notification {
+  id: string;
+  title: string;
+  body: string | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
+interface NotificationListResponse {
+  items: Notification[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+async function getNotifications(): Promise<Notification[]> {
+  const { data } = await apiClient.get<ApiSuccessResponse<NotificationListResponse>>(
+    '/notifications',
+    { params: { page: 1, limit: 50 } },
+  );
+  return data.data.items;
+}
+
+export default function NotificationsScreen() {
+  const { data: notifications, isLoading, isError, refetch, isRefetching } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: getNotifications,
   });
 
   return (
     <View style={styles.container}>
       {isError && (
         <View style={styles.error}>
-          <Text style={styles.errorText}>Не удалось загрузить предложения</Text>
+          <Text style={styles.errorText}>Не удалось загрузить уведомления</Text>
         </View>
       )}
       <FlatList
-        data={offers ?? []}
+        data={notifications ?? []}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <Card style={styles.offerCard}>
-            {item.imageUrl && (
-              <Image source={{ uri: item.imageUrl }} style={styles.offerImage} />
-            )}
-            <View style={styles.offerContent}>
-              <Text style={styles.offerTitle}>{item.title}</Text>
-              <Text style={styles.offerDescription}>{item.description}</Text>
-              {item.expiresAt && (
-                <Badge label={`До ${formatDate(item.expiresAt)}`} color="#FF6B00" />
-              )}
+          <View style={[styles.card, !item.isRead && styles.cardUnread]}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
+              <Text style={styles.cardDate}>{formatRelativeTime(item.createdAt)}</Text>
             </View>
-          </Card>
+            {item.body ? (
+              <Text style={styles.cardBody} numberOfLines={3}>{item.body}</Text>
+            ) : null}
+          </View>
         )}
         refreshControl={
           <RefreshControl refreshing={isRefetching} onRefresh={() => void refetch()} />
@@ -41,7 +60,7 @@ export default function OffersScreen() {
         ListEmptyComponent={
           !isLoading ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyText}>Нет персональных предложений</Text>
+              <Text style={styles.emptyText}>Нет уведомлений</Text>
             </View>
           ) : null
         }
@@ -58,9 +77,36 @@ const styles = StyleSheet.create({
   errorText: { color: '#856404', textAlign: 'center' },
   empty: { padding: 32, alignItems: 'center' },
   emptyText: { color: '#8e8e93', fontSize: 16 },
-  offerCard: { marginBottom: 12, overflow: 'hidden', padding: 0 },
-  offerImage: { width: '100%', height: 160, resizeMode: 'cover' },
-  offerContent: { padding: 16 },
-  offerTitle: { fontSize: 18, fontWeight: '600', marginBottom: 4 },
-  offerDescription: { fontSize: 14, color: '#666', marginBottom: 8 },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 10,
+  },
+  cardUnread: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#007AFF',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1c1c1e',
+    flex: 1,
+    marginRight: 8,
+  },
+  cardDate: {
+    fontSize: 12,
+    color: '#8e8e93',
+  },
+  cardBody: {
+    fontSize: 14,
+    color: '#3c3c43',
+    lineHeight: 20,
+  },
 });
