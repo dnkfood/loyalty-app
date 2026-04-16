@@ -162,6 +162,9 @@ export class LoyaltyService {
     const result = await this.loyaltyClient.registerGuest(user.phone, regionId, name, birthday, email);
     this.logger.log(`Register result: code=${result.code}`);
 
+    // Invalidate any cached data so fresh balance is fetched on next request
+    await this.cacheService.invalidateCache(user.phone);
+
     // Verify that the guest was actually created by calling Info
     let cardCode: string | undefined;
     let balance: number | undefined;

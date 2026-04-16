@@ -74,7 +74,7 @@ describe('LoyaltyCacheService', () => {
       expect(result.bonusPercent).toBe(5);
       expect(result.guestName).toBe('Test');
       expect(result.currentSpend).toBe(12500);
-      expect(redis.setex).toHaveBeenCalledWith(`loyalty:${phone}`, 300, expect.any(String));
+      expect(redis.setex).toHaveBeenCalledWith(`loyalty:${phone}`, 60, expect.any(String));
       expect(prisma.loyaltyCache.upsert).toHaveBeenCalled();
     });
 

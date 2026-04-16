@@ -9,7 +9,7 @@ import type { Redis } from 'ioredis';
 import type { LoyaltyCache } from '@loyalty/shared-types';
 import { LoyaltySystemClient } from './loyalty-system.client';
 
-const CACHE_TTL = 300; // 5 minutes
+const CACHE_TTL = 60; // 1 minute
 const CACHE_KEY = (guestId: string) => `loyalty:${guestId}`;
 
 /**
