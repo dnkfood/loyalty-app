@@ -235,10 +235,11 @@ export class LoyaltySystemClient {
     email?: string,
   ): Promise<{ code: string }> {
     const cell = this.normalizePhone(phone);
-    const params: Record<string, string> = { cell, regionId, name, birthday };
+    const isoBirthday = this.normalizeBirthday(birthday);
+    const params: Record<string, string> = { cell, regionId, name, birthday: isoBirthday };
     if (email) params.email = email;
 
-    this.logger.log(`Register request: cell=${maskPhone(cell)}, regionId=${regionId}, name=${name}, birthday=${birthday}, email=${email ?? '(none)'}`);
+    this.logger.log(`Register request: cell=${maskPhone(cell)}, regionId=${regionId}, name=${name}, birthday=${isoBirthday} (original: ${birthday}), email=${email ?? '(none)'}`);
 
     const data = await this.get<GateEnvelope<{ code?: string; command?: string }>>('Register', params);
     const result = data.root.result;
@@ -288,6 +289,31 @@ export class LoyaltySystemClient {
   }
 
   /**
+   * Converts DD.MM.YYYY → YYYY-MM-DD (ISO-8601).
+   * If already ISO or unparseable, returns as-is.
+   */
+  private normalizeBirthday(raw: string): string {
+    // DD.MM.YYYY
+    const dotMatch = raw.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+    if (dotMatch) {
+      const [, dd, mm, yyyy] = dotMatch;
+      const iso = `${yyyy}-${mm}-${dd}`;
+      if (this.isValidDate(iso)) return iso;
+    }
+    // Already YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw) && this.isValidDate(raw)) {
+      return raw;
+    }
+    this.logger.warn(`Unrecognized birthday format: ${raw}, passing as-is`);
+    return raw;
+  }
+
+  private isValidDate(iso: string): boolean {
+    const d = new Date(iso);
+    return !isNaN(d.getTime()) && d.toISOString().startsWith(iso);
+  }
+
+  /**
    * Makes a GET request to /api/Gate/{command}?{params}
    * Uses URL.searchParams to ensure proper UTF-8 encoding of Cyrillic and special chars.
    */
@@ -317,8 +343,10 @@ export class LoyaltySystemClient {
     }
 
     if (!response.ok) {
+      const errorBody = await response.text().catch(() => '(unreadable)');
+      this.logger.error(`Loyalty system HTTP ${response.status}: ${errorBody}`);
       throw new ServiceUnavailableException(
-        `Loyalty system HTTP ${response.status}`,
+        `Loyalty system HTTP ${response.status}: ${errorBody.slice(0, 500)}`,
       );
     }
 
