@@ -101,8 +101,10 @@ export class AuthService {
   async verifyOtp(
     dto: VerifyOtpDto,
     ipAddress?: string,
+    deviceId?: string,
+    deviceInfo?: unknown,
   ): Promise<{ accessToken: string; refreshToken: string; user: { id: string; phone: string; name: string | null }; isNewUser: boolean }> {
-    const { phone, code, deviceId } = dto;
+    const { phone, code } = dto;
 
     // Check our DB for rate limiting
     const otpRecord = await this.prisma.otpCode.findFirst({
@@ -178,7 +180,7 @@ export class AuthService {
     }
 
     // Issue tokens
-    const { accessToken, refreshToken } = await this.issueTokens(user.id, ipAddress, deviceId);
+    const { accessToken, refreshToken } = await this.issueTokens(user.id, ipAddress, deviceId, deviceInfo);
 
     this.logger.log(`User authenticated`, { phone: maskPhone(phone), userId: user.id });
 
@@ -197,6 +199,9 @@ export class AuthService {
     userId: string,
     sessionId: string,
     rawRefreshToken: string,
+    ipAddress?: string,
+    deviceId?: string,
+    deviceInfo?: unknown,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const session = await this.prisma.authSession.findFirst({
       where: { id: sessionId, userId, expiresAt: { gt: new Date() } },
@@ -213,7 +218,7 @@ export class AuthService {
 
     // Rotate: delete old session, issue new tokens
     await this.prisma.authSession.delete({ where: { id: sessionId } });
-    return this.issueTokens(userId);
+    return this.issueTokens(userId, ipAddress, deviceId, deviceInfo);
   }
 
   /**
@@ -230,6 +235,7 @@ export class AuthService {
     userId: string,
     ipAddress?: string,
     deviceId?: string,
+    deviceInfo?: unknown,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const sessionId = uuidv4();
     const rawRefreshToken = uuidv4() + uuidv4(); // 72-char random string
@@ -244,6 +250,7 @@ export class AuthService {
         userId,
         refreshToken: refreshTokenHash,
         deviceId,
+        deviceInfo: deviceInfo ?? undefined,
         ipAddress,
         expiresAt,
       },

@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Req,
+  Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
@@ -17,6 +18,15 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from './strategies/jwt.strategy';
 import type { JwtRefreshPayload } from './strategies/jwt-refresh.strategy';
 import type { Request } from 'express';
+
+function parseDeviceInfo(raw: string | undefined): unknown | undefined {
+  if (!raw || raw.length > 4096) return undefined;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+}
 
 @ApiTags('auth')
 @Controller('auth')
@@ -35,8 +45,18 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify OTP and receive JWT tokens' })
   @ApiBody({ type: VerifyOtpDto })
-  async verifyOtp(@Body() dto: VerifyOtpDto, @Req() req: Request) {
-    return this.authService.verifyOtp(dto, req.ip);
+  async verifyOtp(
+    @Body() dto: VerifyOtpDto,
+    @Req() req: Request,
+    @Headers('x-device-id') xDeviceId?: string,
+    @Headers('x-device-info') xDeviceInfo?: string,
+  ) {
+    return this.authService.verifyOtp(
+      dto,
+      req.ip,
+      xDeviceId,
+      parseDeviceInfo(xDeviceInfo),
+    );
   }
 
   @Post('refresh')
@@ -45,8 +65,18 @@ export class AuthController {
   @ApiOperation({ summary: 'Refresh access token using refresh token' })
   async refresh(
     @CurrentUser() user: JwtRefreshPayload & { refreshToken: string },
+    @Req() req: Request,
+    @Headers('x-device-id') xDeviceId?: string,
+    @Headers('x-device-info') xDeviceInfo?: string,
   ) {
-    return this.authService.refresh(user.sub, user.sessionId, user.refreshToken);
+    return this.authService.refresh(
+      user.sub,
+      user.sessionId,
+      user.refreshToken,
+      req.ip,
+      xDeviceId,
+      parseDeviceInfo(xDeviceInfo),
+    );
   }
 
   @Post('logout')
@@ -55,8 +85,6 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Logout and invalidate refresh token' })
   async logout(@CurrentUser() user: JwtPayload): Promise<void> {
-    // sessionId is embedded in the refresh payload; here we use the access token userId
-    // In a real implementation, sessionId would be passed in the request body
     await this.authService.logout(user.sub, '');
   }
 }

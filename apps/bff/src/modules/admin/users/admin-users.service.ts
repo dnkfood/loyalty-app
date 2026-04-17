@@ -148,4 +148,49 @@ export class AdminUsersService {
 
     return { items: transactions, total, page, limit };
   }
+
+  /**
+   * Gets all auth sessions for a user.
+   */
+  async getUserSessions(userId: string) {
+    const sessions = await this.prisma.authSession.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        deviceId: true,
+        deviceInfo: true,
+        ipAddress: true,
+        expiresAt: true,
+        createdAt: true,
+      },
+    });
+    return { items: sessions };
+  }
+
+  /**
+   * Gets push tokens for a user (token values masked).
+   */
+  async getUserPushTokens(userId: string) {
+    const tokens = await this.prisma.pushToken.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        token: true,
+        platform: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    return {
+      items: tokens.map((t) => ({
+        ...t,
+        token: t.token.length > 12
+          ? `${t.token.slice(0, 6)}...${t.token.slice(-6)}`
+          : '***',
+      })),
+    };
+  }
 }

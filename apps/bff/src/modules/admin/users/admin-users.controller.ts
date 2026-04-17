@@ -61,4 +61,18 @@ export class AdminUsersController {
   ) {
     return this.adminUsersService.getUserTransactions(id, page, Math.min(limit, 100));
   }
+
+  @Get(':id/sessions')
+  @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.SUPPORT)
+  @ApiOperation({ summary: 'Get user auth sessions' })
+  async getUserSessions(@Param('id') id: string) {
+    return this.adminUsersService.getUserSessions(id);
+  }
+
+  @Get(':id/push-tokens')
+  @Roles(StaffRole.SUPER_ADMIN, StaffRole.ADMIN, StaffRole.SUPPORT)
+  @ApiOperation({ summary: 'Get user push tokens' })
+  async getUserPushTokens(@Param('id') id: string) {
+    return this.adminUsersService.getUserPushTokens(id);
+  }
 }
