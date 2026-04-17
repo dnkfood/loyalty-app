@@ -1,5 +1,6 @@
 import { ProTable, type ProColumns, type RequestData } from '@ant-design/pro-components';
 import { Tag } from 'antd';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import type { ApiSuccessResponse } from '@loyalty/shared-types';
 
@@ -70,6 +71,8 @@ const columns: ProColumns<AdminUser>[] = [
 ];
 
 export function UsersPage() {
+  const navigate = useNavigate();
+
   const fetchUsers = async (
     params: { pageSize?: number; current?: number; [key: string]: unknown },
   ): Promise<RequestData<AdminUser>> => {
@@ -96,6 +99,10 @@ export function UsersPage() {
       pagination={{ pageSize: 20 }}
       search={{ labelWidth: 'auto' }}
       dateFormatter="string"
+      onRow={(record) => ({
+        onClick: () => navigate(`/users/${record.id}`),
+        style: { cursor: 'pointer' },
+      })}
     />
   );
 }

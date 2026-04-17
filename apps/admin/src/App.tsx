@@ -4,6 +4,7 @@ import { AdminLayout } from './layouts/AdminLayout';
 import { LoginPage } from './pages/login/LoginPage';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { UsersPage } from './pages/users/UsersPage';
+import { UserDetailPage } from './pages/users/UserDetailPage';
 import { CampaignsPage } from './pages/campaigns/CampaignsPage';
 import { SmsLogsPage } from './pages/sms-logs/SmsLogsPage';
 import { AuditLogPage } from './pages/audit/AuditLogPage';
@@ -36,6 +37,7 @@ export default function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="users" element={<UsersPage />} />
+          <Route path="users/:id" element={<UserDetailPage />} />
           <Route path="campaigns" element={<CampaignsPage />} />
           <Route path="sms-logs" element={<SmsLogsPage />} />
           <Route path="audit" element={<AuditLogPage />} />
