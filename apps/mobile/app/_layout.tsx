@@ -15,6 +15,7 @@ import { Component, type ReactNode } from 'react';
 import { usePushNotifications } from '../src/hooks/usePushNotifications';
 import { useAuthStore } from '../src/stores/auth.store';
 import { getRefreshToken, saveTokens, clearTokens } from '../src/utils/token';
+import { getDeviceId, collectDeviceInfo } from '../src/utils/deviceInfo';
 import axios from 'axios';
 
 // Wire React Query focusManager to AppState so queries refetch when app returns to foreground
@@ -89,7 +90,10 @@ function useAuthSession() {
         try {
           const { data } = await axios.post<{
             data: { accessToken: string; refreshToken: string };
-          }>(`${BASE_URL}/auth/refresh`, { refreshToken }, { timeout: 10_000 });
+          }>(`${BASE_URL}/auth/refresh`, { refreshToken }, {
+            timeout: 10_000,
+            headers: { 'X-Device-Id': getDeviceId(), 'X-Device-Info': collectDeviceInfo() },
+          });
 
           const { accessToken, refreshToken: newRefreshToken } = data.data;
 

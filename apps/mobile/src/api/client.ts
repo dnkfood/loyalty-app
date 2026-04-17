@@ -1,6 +1,7 @@
 import axios, { type AxiosRequestConfig } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { useAuthStore } from '../stores/auth.store';
+import { getDeviceId, collectDeviceInfo } from '../utils/deviceInfo';
 
 const BASE_URL =
   (process.env.EXPO_PUBLIC_BFF_URL as string | undefined) ?? 'http://45.84.87.169:3000/api/v1';
@@ -73,7 +74,9 @@ apiClient.interceptors.response.use(
 
         const { data } = await axios.post<{
           data: { accessToken: string; refreshToken: string };
-        }>(`${BASE_URL}/auth/refresh`, { refreshToken });
+        }>(`${BASE_URL}/auth/refresh`, { refreshToken }, {
+          headers: { 'X-Device-Id': getDeviceId(), 'X-Device-Info': collectDeviceInfo() },
+        });
 
         const { accessToken, refreshToken: newRefreshToken } = data.data;
 
