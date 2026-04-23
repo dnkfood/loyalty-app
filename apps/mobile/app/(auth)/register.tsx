@@ -7,6 +7,9 @@ import {
   Alert,
   ScrollView,
   TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Button } from '../../src/components/ui/Button';
@@ -49,6 +52,7 @@ export default function RegisterScreen() {
     lastName.trim().length > 0 &&
     firstName.trim().length > 0 &&
     birthday.length === 10 &&
+    email.trim().length > 0 &&
     selectedRegion != null;
 
   const handleRegister = async () => {
@@ -60,7 +64,7 @@ export default function RegisterScreen() {
         name: fullName,
         birthday,
         regionId: selectedRegion.id,
-        email: email.trim() || undefined,
+        email: email.trim(),
       });
       // Clear registration flag so root layout lets user into (app)
       useAuthStore.getState().setNeedsRegistration(false);
@@ -73,6 +77,10 @@ export default function RegisterScreen() {
   };
 
   return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
     <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>Регистрация</Text>
       <Text style={styles.subtitle}>Заполните данные для программы лояльности</Text>
@@ -114,7 +122,7 @@ export default function RegisterScreen() {
         maxLength={10}
       />
 
-      <Text style={styles.label}>Email</Text>
+      <Text style={styles.label}>Email *</Text>
       <TextInput
         style={styles.input}
         value={email}
@@ -127,7 +135,10 @@ export default function RegisterScreen() {
       <Text style={styles.label}>Город *</Text>
       <TouchableOpacity
         style={styles.select}
-        onPress={() => setShowRegions(!showRegions)}
+        onPress={() => {
+          Keyboard.dismiss();
+          setShowRegions(!showRegions);
+        }}
       >
         <Text style={selectedRegion ? styles.selectText : styles.selectPlaceholder}>
           {selectedRegion?.name ?? 'Выберите город'}
@@ -136,7 +147,11 @@ export default function RegisterScreen() {
       </TouchableOpacity>
 
       {showRegions && (
-        <View style={styles.dropdown}>
+        <ScrollView
+          style={styles.dropdown}
+          nestedScrollEnabled
+          keyboardShouldPersistTaps="handled"
+        >
           {regions.map((r) => (
             <TouchableOpacity
               key={r.id}
@@ -152,7 +167,7 @@ export default function RegisterScreen() {
               <Text style={styles.dropdownText}>{r.name}</Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
       )}
 
       <View style={styles.buttonWrapper}>
@@ -164,6 +179,7 @@ export default function RegisterScreen() {
         />
       </View>
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
