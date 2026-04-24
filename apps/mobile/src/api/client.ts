@@ -4,7 +4,7 @@ import { useAuthStore } from '../stores/auth.store';
 import { getDeviceId, collectDeviceInfo } from '../utils/deviceInfo';
 
 const BASE_URL =
-  (process.env.EXPO_PUBLIC_BFF_URL as string | undefined) ?? 'http://45.84.87.169:3000/api/v1';
+  (process.env.EXPO_PUBLIC_BFF_URL as string | undefined) ?? 'https://loyalty.dnkfood.ru/api/v1';
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
