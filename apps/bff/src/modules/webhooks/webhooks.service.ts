@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Queue } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
+import { LoyaltyCacheService } from '../loyalty/loyalty.cache.service';
 import type { LoyaltyWebhookPayload } from '@loyalty/shared-types';
 
 export const WEBHOOK_QUEUE_NAME = 'webhook-events';
@@ -14,6 +15,7 @@ export class WebhooksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly loyaltyCache: LoyaltyCacheService,
   ) {
     const redisUrl = this.configService.get<string>('redis.url', 'redis://localhost:6379');
     const [host, portStr] = redisUrl.replace('redis://', '').split(':');
@@ -25,7 +27,18 @@ export class WebhooksService {
   }
 
   /**
-   * Processes incoming webhook event with idempotency check.
+   * Loyalty notified us that a guest's balance changed — drop Redis cache so
+   * the next mobile request refetches fresh data from the loyalty API.
+   * `cell` is a 10-digit phone (no country code), which is also the cache key
+   * (LoyaltyCacheService keys by phone).
+   */
+  async handleBalanceChanged(cell: string): Promise<void> {
+    await this.loyaltyCache.invalidateCache(cell);
+  }
+
+  /**
+   * @deprecated Old POST+HMAC path. Kept for spec compatibility while we
+   * migrate to the GET+atoken contract used by the Loyalty system.
    */
   async processEvent(payload: LoyaltyWebhookPayload): Promise<void> {
     this.logger.log(`Processing webhook event`, {
@@ -34,7 +47,6 @@ export class WebhooksService {
       guestId: payload.guest_id,
     });
 
-    // 1. Check idempotency — if event_id already processed, skip
     const existing = await this.prisma.transactionLog.findUnique({
       where: { eventId: payload.event_id },
     });
@@ -44,7 +56,6 @@ export class WebhooksService {
       return;
     }
 
-    // 2. Enqueue for async processing with retry
     await this.webhookQueue.add(payload.event_type, payload, {
       attempts: 3,
       backoff: { type: 'exponential', delay: 1000 },

@@ -1,20 +1,30 @@
 import {
   Controller,
-  Post,
-  Body,
-  Headers,
-  Req,
+  Get,
+  Query,
   UnauthorizedException,
+  BadRequestException,
   HttpCode,
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
-import type { Request } from 'express';
+import { Throttle } from '@nestjs/throttler';
+import { timingSafeEqual } from 'node:crypto';
 import { WebhooksService } from './webhooks.service';
-import { verifyHmacSignature } from '../../common/utils/hmac';
-import type { LoyaltyWebhookPayload } from '@loyalty/shared-types';
+
+function maskCell(cell: string): string {
+  if (cell.length < 6) return cell;
+  return `${cell.slice(0, 3)}***${cell.slice(-3)}`;
+}
+
+function safeEqualString(a: string, b: string): boolean {
+  const ab = Buffer.from(a, 'utf8');
+  const bb = Buffer.from(b, 'utf8');
+  if (ab.length !== bb.length) return false;
+  return timingSafeEqual(ab, bb);
+}
 
 @ApiTags('webhooks')
 @Controller('webhooks')
@@ -26,39 +36,40 @@ export class WebhooksController {
     private readonly configService: ConfigService,
   ) {}
 
-  @Post('loyalty')
+  @Get('loyalty')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Receive loyalty system webhook events' })
+  @ApiOperation({
+    summary:
+      'Loyalty system webhook (GET): notifies BFF that a guest balance has changed; we drop Redis cache for this cell.',
+  })
+  @ApiQuery({ name: 'atoken', required: true, description: 'Static auth token' })
+  @ApiQuery({ name: 'cell', required: true, description: 'Guest phone (10 digits)' })
   async receiveLoyaltyWebhook(
-    @Body() payload: LoyaltyWebhookPayload,
-    @Headers('x-loyalty-signature') signature: string,
-    @Req() req: Request & { rawBody?: Buffer },
+    @Query('atoken') atoken: string,
+    @Query('cell') cell: string,
   ): Promise<{ received: boolean }> {
-    // HMAC verification using raw body
-    const webhookSecret = this.configService.get<string>('app.loyaltySystem.webhookSecret', '');
-    const rawBody = req.rawBody;
+    const expected = this.configService.get<string>('app.loyaltySystem.webhookSecret', '');
 
-    if (!rawBody) {
-      this.logger.warn('Webhook received without raw body', { ip: req.ip });
-      throw new UnauthorizedException('Raw body not available');
+    if (!expected) {
+      this.logger.error('LOYALTY_WEBHOOK_SECRET is not configured — rejecting webhook');
+      throw new UnauthorizedException('Webhook secret not configured');
     }
 
-    if (!signature) {
-      this.logger.warn('Webhook received without signature', { ip: req.ip });
-      throw new UnauthorizedException('Missing X-Loyalty-Signature header');
+    if (!atoken || !safeEqualString(atoken, expected)) {
+      this.logger.warn('Webhook rejected: invalid or missing atoken');
+      throw new UnauthorizedException('Invalid atoken');
     }
 
-    const isValid = verifyHmacSignature(webhookSecret, rawBody, signature);
-
-    if (!isValid) {
-      this.logger.warn('Invalid webhook signature', {
-        ip: req.ip,
-        signature: signature.slice(0, 20) + '...',
-      });
-      throw new UnauthorizedException('Invalid webhook signature');
+    const digits = (cell ?? '').replace(/\D/g, '');
+    if (digits.length !== 10) {
+      this.logger.warn(`Webhook rejected: invalid cell format (len=${digits.length})`);
+      throw new BadRequestException('cell must be 10 digits');
     }
 
-    await this.webhooksService.processEvent(payload);
+    this.logger.log(`Webhook received for cell=${maskCell(digits)}`);
+
+    await this.webhooksService.handleBalanceChanged(digits);
     return { received: true };
   }
 }

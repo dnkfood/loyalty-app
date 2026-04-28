@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { mockDeep, type DeepMockProxy } from 'jest-mock-extended';
 import { WebhooksService } from './webhooks.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { LoyaltyCacheService } from '../loyalty/loyalty.cache.service';
 import type { LoyaltyWebhookPayload } from '@loyalty/shared-types';
 
 // Mock bullmq Queue to avoid real Redis connections
@@ -25,6 +26,7 @@ const { __mockAdd: mockQueueAdd } = jest.requireMock('bullmq');
 describe('WebhooksService', () => {
   let service: WebhooksService;
   let prisma: DeepMockProxy<PrismaService>;
+  let loyaltyCache: DeepMockProxy<LoyaltyCacheService>;
 
   const payload: LoyaltyWebhookPayload = {
     event_id: 'evt-001',
@@ -42,6 +44,7 @@ describe('WebhooksService', () => {
 
   beforeEach(async () => {
     prisma = mockDeep<PrismaService>();
+    loyaltyCache = mockDeep<LoyaltyCacheService>();
     const configService = mockDeep<ConfigService>();
     configService.get.mockReturnValue('redis://localhost:6379');
 
@@ -52,10 +55,18 @@ describe('WebhooksService', () => {
         WebhooksService,
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: configService },
+        { provide: LoyaltyCacheService, useValue: loyaltyCache },
       ],
     }).compile();
 
     service = module.get(WebhooksService);
+  });
+
+  describe('handleBalanceChanged', () => {
+    it('invalidates the cache for the given cell', async () => {
+      await service.handleBalanceChanged('9139481833');
+      expect(loyaltyCache.invalidateCache).toHaveBeenCalledWith('9139481833');
+    });
   });
 
   describe('processEvent', () => {
