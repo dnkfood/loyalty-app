@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
   Alert,
   ScrollView,
@@ -12,9 +11,14 @@ import {
   Keyboard,
 } from 'react-native';
 import { router } from 'expo-router';
-import { Button } from '../../src/components/ui/Button';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import { apiClient } from '../../src/api/client';
 import { useAuthStore } from '../../src/stores/auth.store';
+import { PrimaryButton } from '../../src/components/ui/PrimaryButton';
+import { TextField } from '../../src/components/ui/TextField';
+import { Colors, Type, Fonts, Spacing, Radii } from '../../src/theme/tokens';
 import type { ApiSuccessResponse } from '@loyalty/shared-types';
 
 interface Region {
@@ -66,7 +70,6 @@ export default function RegisterScreen() {
         regionId: selectedRegion.id,
         email: email.trim(),
       });
-      // Clear registration flag so root layout lets user into (app)
       useAuthStore.getState().setNeedsRegistration(false);
       router.replace('/(app)' as never);
     } catch {
@@ -77,196 +80,227 @@ export default function RegisterScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <Text style={styles.title}>Регистрация</Text>
-      <Text style={styles.subtitle}>Заполните данные для программы лояльности</Text>
-
-      <Text style={styles.label}>Фамилия *</Text>
-      <TextInput
-        style={styles.input}
-        value={lastName}
-        onChangeText={setLastName}
-        placeholder="Иванов"
-        autoCapitalize="words"
-      />
-
-      <Text style={styles.label}>Имя *</Text>
-      <TextInput
-        style={styles.input}
-        value={firstName}
-        onChangeText={setFirstName}
-        placeholder="Иван"
-        autoCapitalize="words"
-      />
-
-      <Text style={styles.label}>Отчество</Text>
-      <TextInput
-        style={styles.input}
-        value={patronymic}
-        onChangeText={setPatronymic}
-        placeholder="Иванович"
-        autoCapitalize="words"
-      />
-
-      <Text style={styles.label}>Дата рождения *</Text>
-      <TextInput
-        style={styles.input}
-        value={birthday}
-        onChangeText={(t) => setBirthday(applyDateMask(t))}
-        placeholder="ДД.ММ.ГГГГ"
-        keyboardType="number-pad"
-        maxLength={10}
-      />
-
-      <Text style={styles.label}>Email *</Text>
-      <TextInput
-        style={styles.input}
-        value={email}
-        onChangeText={setEmail}
-        placeholder="email@example.com"
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-
-      <Text style={styles.label}>Город *</Text>
-      <TouchableOpacity
-        style={styles.select}
-        onPress={() => {
-          Keyboard.dismiss();
-          setShowRegions(!showRegions);
-        }}
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <StatusBar style="dark" />
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <Text style={selectedRegion ? styles.selectText : styles.selectPlaceholder}>
-          {selectedRegion?.name ?? 'Выберите город'}
-        </Text>
-        <Text style={styles.selectArrow}>{showRegions ? '▲' : '▼'}</Text>
-      </TouchableOpacity>
-
-      {showRegions && (
         <ScrollView
-          style={styles.dropdown}
-          nestedScrollEnabled
+          style={styles.flex}
+          contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          {regions.map((r) => (
-            <TouchableOpacity
-              key={r.id}
-              style={[
-                styles.dropdownItem,
-                selectedRegion?.id === r.id && styles.dropdownItemSelected,
-              ]}
-              onPress={() => {
-                setSelectedRegion(r);
-                setShowRegions(false);
-              }}
-            >
-              <Text style={styles.dropdownText}>{r.name}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
+          <Text style={styles.title}>Регистрация</Text>
+          <Text style={styles.subtitle}>
+            Заполните данные для программы лояльности
+          </Text>
 
-      <View style={styles.buttonWrapper}>
-        <Button
-          title="Зарегистрироваться"
-          onPress={() => void handleRegister()}
-          loading={loading}
-          disabled={!canSubmit}
-        />
-      </View>
-    </ScrollView>
-    </KeyboardAvoidingView>
+          <TextField
+            label="Фамилия"
+            required
+            value={lastName}
+            onChangeText={setLastName}
+            placeholder="Иванов"
+            autoCapitalize="words"
+          />
+
+          <TextField
+            label="Имя"
+            required
+            value={firstName}
+            onChangeText={setFirstName}
+            placeholder="Иван"
+            autoCapitalize="words"
+          />
+
+          <TextField
+            label="Отчество"
+            value={patronymic}
+            onChangeText={setPatronymic}
+            placeholder="Иванович"
+            autoCapitalize="words"
+          />
+
+          <TextField
+            label="Дата рождения"
+            required
+            value={birthday}
+            onChangeText={(t) => setBirthday(applyDateMask(t))}
+            placeholder="ДД.ММ.ГГГГ"
+            keyboardType="number-pad"
+            maxLength={10}
+          />
+
+          <TextField
+            label="Email"
+            required
+            value={email}
+            onChangeText={setEmail}
+            placeholder="email@example.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+
+          <Text style={styles.cityLabel}>
+            Город<Text style={styles.requiredMark}>{' *'}</Text>
+          </Text>
+          <TouchableOpacity
+            style={[
+              styles.select,
+              showRegions && styles.selectOpen,
+            ]}
+            onPress={() => {
+              Keyboard.dismiss();
+              setShowRegions(!showRegions);
+            }}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={selectedRegion ? styles.selectText : styles.selectPlaceholder}
+            >
+              {selectedRegion?.name ?? 'Выберите город'}
+            </Text>
+            <Ionicons
+              name={showRegions ? 'chevron-up' : 'chevron-down'}
+              size={18}
+              color={Colors.inkMuted}
+            />
+          </TouchableOpacity>
+
+          {showRegions && (
+            <ScrollView
+              style={styles.dropdown}
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+            >
+              {regions.map((r) => {
+                const selected = selectedRegion?.id === r.id;
+                return (
+                  <TouchableOpacity
+                    key={r.id}
+                    style={[
+                      styles.dropdownItem,
+                      selected && styles.dropdownItemSelected,
+                    ]}
+                    onPress={() => {
+                      setSelectedRegion(r);
+                      setShowRegions(false);
+                    }}
+                    activeOpacity={0.6}
+                  >
+                    <Text
+                      style={[
+                        styles.dropdownText,
+                        selected && styles.dropdownTextSelected,
+                      ]}
+                    >
+                      {r.name}
+                    </Text>
+                    {selected ? (
+                      <Ionicons name="checkmark" size={16} color={Colors.ink} />
+                    ) : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
+
+          <View style={styles.buttonWrap}>
+            <PrimaryButton
+              title="Зарегистрироваться"
+              onPress={() => void handleRegister()}
+              loading={loading}
+              disabled={!canSubmit}
+            />
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
+  safe: { flex: 1, backgroundColor: Colors.bg },
+  flex: { flex: 1 },
   content: {
     padding: 24,
-    paddingTop: 48,
+    paddingTop: 32,
+    paddingBottom: 48,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    ...Type.title,
     textAlign: 'center',
-    marginBottom: 8,
-    color: '#1a1a1a',
+    marginBottom: Spacing.sm,
   },
   subtitle: {
-    fontSize: 14,
+    ...Type.body,
+    color: Colors.inkSub,
     textAlign: 'center',
-    color: '#666',
     marginBottom: 24,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 6,
-    marginTop: 12,
+  cityLabel: {
+    ...Type.small,
+    marginBottom: 8,
+    marginTop: 0,
   },
-  input: {
-    height: 48,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    fontSize: 16,
-    backgroundColor: '#fafafa',
+  requiredMark: {
+    color: Colors.ink,
   },
   select: {
-    height: 48,
+    minHeight: 54,
+    backgroundColor: Colors.surface,
+    borderRadius: Radii.md,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
+    borderColor: Colors.divider,
     paddingHorizontal: 14,
-    backgroundColor: '#fafafa',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  selectOpen: {
+    borderColor: Colors.ink,
+  },
   selectText: {
+    fontFamily: Fonts.sansMed,
     fontSize: 16,
-    color: '#1a1a1a',
+    color: Colors.ink,
   },
   selectPlaceholder: {
+    fontFamily: Fonts.sansMed,
     fontSize: 16,
-    color: '#999',
-  },
-  selectArrow: {
-    fontSize: 12,
-    color: '#999',
+    color: Colors.inkMuted,
   },
   dropdown: {
+    marginTop: 6,
+    borderRadius: Radii.md,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    marginTop: 4,
-    backgroundColor: '#fff',
-    maxHeight: 200,
+    borderColor: Colors.divider,
+    backgroundColor: Colors.surface,
+    maxHeight: 220,
   },
   dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#eee',
+    borderBottomColor: Colors.divider,
   },
   dropdownItemSelected: {
-    backgroundColor: '#e8f0fe',
+    backgroundColor: Colors.bgAlt,
   },
   dropdownText: {
+    fontFamily: Fonts.sans,
     fontSize: 15,
-    color: '#1a1a1a',
+    color: Colors.ink,
   },
-  buttonWrapper: {
-    marginTop: 24,
-    marginBottom: 32,
+  dropdownTextSelected: {
+    fontFamily: Fonts.sansSemi,
+  },
+  buttonWrap: {
+    marginTop: 28,
   },
 });

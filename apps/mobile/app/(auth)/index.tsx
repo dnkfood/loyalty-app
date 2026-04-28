@@ -2,18 +2,21 @@ import { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
   Alert,
-  TouchableOpacity,
   Linking,
   ScrollView,
 } from 'react-native';
 import { router } from 'expo-router';
-import { Button } from '../../src/components/ui/Button';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { sendOtp } from '../../src/api/auth.api';
+import { PrimaryButton } from '../../src/components/ui/PrimaryButton';
+import { TextField } from '../../src/components/ui/TextField';
+import { Checkbox } from '../../src/components/ui/Checkbox';
+import { Colors, Type, Fonts, Spacing } from '../../src/theme/tokens';
 
 function applyPhoneMask(raw: string): string {
   const digits = raw.replace(/\D/g, '').slice(0, 10);
@@ -61,150 +64,118 @@ export default function PhoneScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Loyalty App</Text>
-        <Text style={styles.subtitle}>Введите номер телефона для входа</Text>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <StatusBar style="dark" />
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.brandWrap}>
+            <Text style={styles.brandText}>DNK</Text>
+          </View>
 
-        <View style={styles.phoneRow}>
-          <Text style={styles.prefix}>+7</Text>
-          <TextInput
-            style={styles.input}
+          <Text style={styles.title}>Вход</Text>
+          <Text style={styles.subtitle}>
+            Введите номер телефона, на него придёт код подтверждения
+          </Text>
+
+          <TextField
+            label="Номер телефона"
+            required
             value={display}
             onChangeText={handleChangeText}
             placeholder="(9XX) XXX-XX-XX"
             keyboardType="phone-pad"
             maxLength={15}
             autoFocus
+            leftSlot={<Text style={styles.prefix}>+7</Text>}
           />
-        </View>
 
-        <TouchableOpacity
-          style={styles.checkboxRow}
-          onPress={() => setPrivacyAccepted(!privacyAccepted)}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.checkbox, privacyAccepted && styles.checkboxChecked]}>
-            {privacyAccepted && <Text style={styles.checkmark}>✓</Text>}
-          </View>
-          <Text style={styles.checkboxLabel}>
-            Я согласен с{' '}
-            <Text
-              style={styles.link}
-              onPress={() => void Linking.openURL('https://dnkfood.ru/privacy')}
+          <View style={styles.checks}>
+            <Checkbox
+              checked={privacyAccepted}
+              onToggle={() => setPrivacyAccepted(!privacyAccepted)}
             >
-              политикой обработки персональных данных
-            </Text>
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.checkboxRow}
-          onPress={() => setAdsAccepted(!adsAccepted)}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.checkbox, adsAccepted && styles.checkboxChecked]}>
-            {adsAccepted && <Text style={styles.checkmark}>✓</Text>}
+              Я согласен с{' '}
+              <Text
+                style={styles.link}
+                onPress={() => void Linking.openURL('https://dnkfood.ru/privacy')}
+              >
+                политикой обработки персональных данных
+              </Text>
+            </Checkbox>
+            <Checkbox
+              checked={adsAccepted}
+              onToggle={() => setAdsAccepted(!adsAccepted)}
+            >
+              Я согласен на получение рекламных рассылок
+            </Checkbox>
           </View>
-          <Text style={styles.checkboxLabel}>
-            Я согласен на получение рекламных рассылок
-          </Text>
-        </TouchableOpacity>
 
-        <Button
-          title="Получить код"
-          onPress={() => void handleSendOtp()}
-          loading={loading}
-          disabled={!canSubmit}
-        />
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <PrimaryButton
+            title="Получить код"
+            onPress={() => void handleSendOtp()}
+            loading={loading}
+            disabled={!canSubmit}
+            style={styles.cta}
+          />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
+  safe: { flex: 1, backgroundColor: Colors.bg },
+  flex: { flex: 1 },
   content: {
     flexGrow: 1,
     padding: 24,
-    justifyContent: 'center',
+    paddingTop: 32,
+  },
+  brandWrap: {
+    alignItems: 'center',
+    marginBottom: 36,
+  },
+  brandText: {
+    fontFamily: Fonts.sansBold,
+    fontSize: 28,
+    color: Colors.ink,
+    letterSpacing: 6,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    ...Type.title,
     textAlign: 'center',
-    marginBottom: 8,
-    color: '#1a1a1a',
+    marginBottom: Spacing.sm,
   },
   subtitle: {
-    fontSize: 16,
+    ...Type.body,
+    color: Colors.inkSub,
     textAlign: 'center',
-    color: '#666',
-    marginBottom: 32,
-  },
-  phoneRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 12,
-    backgroundColor: '#fafafa',
-    marginBottom: 16,
-    height: 52,
-  },
-  prefix: {
-    fontSize: 18,
-    color: '#999',
-    paddingLeft: 16,
-    paddingRight: 4,
-    fontWeight: '500',
-  },
-  input: {
-    flex: 1,
-    height: 52,
-    fontSize: 18,
+    marginBottom: 28,
     paddingHorizontal: 8,
   },
-  checkboxRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+  prefix: {
+    fontFamily: Fonts.sansMed,
+    fontSize: 16,
+    color: Colors.inkSub,
+  },
+  checks: {
+    marginTop: 8,
     marginBottom: 12,
-    paddingRight: 8,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderWidth: 2,
-    borderColor: '#ccc',
-    borderRadius: 4,
-    marginRight: 10,
-    marginTop: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
-  },
-  checkmark: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  checkboxLabel: {
-    flex: 1,
-    fontSize: 14,
-    color: '#333',
-    lineHeight: 20,
+    gap: 4,
   },
   link: {
-    color: '#007AFF',
+    color: Colors.ink,
     textDecorationLine: 'underline',
+    fontFamily: Fonts.sansMed,
+  },
+  cta: {
+    marginTop: 16,
   },
 });

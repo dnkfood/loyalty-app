@@ -13,8 +13,10 @@ export const Colors = {
   inkSub: '#3A3733',
   inkMuted: '#7A736B',
   divider: 'rgba(20,20,20,0.10)',
+  dividerStrong: 'rgba(20,20,20,0.22)',
   positive: '#1F7A3A',
   warn: '#B86A2B',
+  danger: '#B43838',
 } as const;
 
 export const Fonts = {
@@ -33,6 +35,13 @@ export const Type: Record<string, TextStyle> = {
     lineHeight: 44,
     letterSpacing: -0.5,
     color: Colors.heroInk,
+  },
+  title: {
+    fontFamily: Fonts.sansSemi,
+    fontSize: 26,
+    lineHeight: 32,
+    letterSpacing: -0.3,
+    color: Colors.ink,
   },
   h1: {
     fontFamily: Fonts.sansSemi,

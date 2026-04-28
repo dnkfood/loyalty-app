@@ -10,14 +10,22 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import { Button } from '../../src/components/ui/Button';
-import { verifyOtp } from '../../src/api/auth.api';
-import { sendOtp } from '../../src/api/auth.api';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { verifyOtp, sendOtp } from '../../src/api/auth.api';
 import { useAuthStore } from '../../src/stores/auth.store';
 import { saveTokens } from '../../src/utils/token';
 import { maskPhone } from '@loyalty/shared-utils';
+import { PrimaryButton } from '../../src/components/ui/PrimaryButton';
+import { Colors, Type, Fonts, Spacing, Radii } from '../../src/theme/tokens';
 
 const RESEND_COOLDOWN = 60;
+
+function formatTimer(s: number): string {
+  const mm = Math.floor(s / 60);
+  const ss = s % 60;
+  return `${mm}:${String(ss).padStart(2, '0')}`;
+}
 
 export default function VerifyScreen() {
   const { phone } = useLocalSearchParams<{ phone: string }>();
@@ -25,6 +33,7 @@ export default function VerifyScreen() {
   const [loading, setLoading] = useState(false);
   const [resendSeconds, setResendSeconds] = useState(RESEND_COOLDOWN);
   const [resending, setResending] = useState(false);
+  const [focused, setFocused] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const setAuth = useAuthStore((s) => s.setAuth);
@@ -76,7 +85,6 @@ export default function VerifyScreen() {
       console.log('[Verify] isNewUser:', result.isNewUser);
       await saveTokens(result.accessToken, result.refreshToken);
       if (result.isNewUser) {
-        // Set needsRegistration BEFORE setAuth so root layout keeps user in (auth) stack
         useAuthStore.getState().setNeedsRegistration(true);
         setAuth(result.accessToken, { ...result.user, name: result.user.name ?? null });
         router.replace('/(auth)/register' as never);
@@ -92,97 +100,162 @@ export default function VerifyScreen() {
   };
 
   const canResend = resendSeconds === 0 && !resending;
+  const masked = maskPhone(phone ?? '');
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <View style={styles.content}>
-        <Text style={styles.title}>Подтверждение</Text>
-        <Text style={styles.subtitle}>
-          Введите код, отправленный на номер {maskPhone(phone ?? '')}
-        </Text>
-
-        <TextInput
-          ref={inputRef}
-          style={styles.input}
-          value={code}
-          onChangeText={setCode}
-          placeholder="------"
-          keyboardType="number-pad"
-          maxLength={10}
-          autoFocus
-          textAlign="center"
-        />
-
-        <Button
-          title="Подтвердить"
-          onPress={() => void handleVerify()}
-          loading={loading}
-          disabled={code.length < 4}
-        />
-
-        <TouchableOpacity
-          style={styles.resendButton}
-          onPress={() => void handleResend()}
-          disabled={!canResend}
-        >
-          <Text style={[styles.resendText, !canResend && styles.resendTextDisabled]}>
-            {resendSeconds > 0
-              ? `Повторить через ${resendSeconds} сек`
-              : 'Отправить код повторно'}
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <StatusBar style="dark" />
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={styles.content}>
+          <Text style={styles.title}>Подтверждение</Text>
+          <Text style={styles.subtitle}>
+            Код отправлен на <Text style={styles.subtitleStrong}>{masked}</Text>
           </Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => inputRef.current?.focus()}
+            style={[
+              styles.codeField,
+              focused && styles.codeFieldFocused,
+            ]}
+          >
+            <TextInput
+              ref={inputRef}
+              style={styles.codeInput}
+              value={code}
+              onChangeText={setCode}
+              placeholder="------"
+              placeholderTextColor={Colors.inkMuted}
+              keyboardType="number-pad"
+              maxLength={10}
+              autoFocus
+              textAlign="center"
+              selectionColor={Colors.ink}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.resendBtn}
+            onPress={() => void handleResend()}
+            disabled={!canResend}
+            activeOpacity={0.6}
+          >
+            <Text
+              style={[
+                styles.resendText,
+                canResend ? styles.resendActive : styles.resendDisabled,
+              ]}
+            >
+              {resendSeconds > 0
+                ? `Отправить код повторно через ${formatTimer(resendSeconds)}`
+                : 'Отправить код повторно'}
+            </Text>
+          </TouchableOpacity>
+
+          <PrimaryButton
+            title="Подтвердить"
+            onPress={() => void handleVerify()}
+            loading={loading}
+            disabled={code.length < 4}
+            style={styles.cta}
+          />
+
+          <TouchableOpacity
+            style={styles.backLink}
+            onPress={() => router.back()}
+            activeOpacity={0.6}
+          >
+            <Text style={styles.backText}>Изменить номер</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
+  safe: { flex: 1, backgroundColor: Colors.bg },
+  flex: { flex: 1 },
   content: {
     flex: 1,
     padding: 24,
-    justifyContent: 'center',
+    paddingTop: 48,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    ...Type.title,
     textAlign: 'center',
-    marginBottom: 8,
-    color: '#1a1a1a',
+    marginBottom: Spacing.sm,
   },
   subtitle: {
-    fontSize: 16,
+    ...Type.body,
+    color: Colors.inkSub,
     textAlign: 'center',
-    color: '#666',
-    marginBottom: 32,
+    marginBottom: 36,
   },
-  input: {
+  subtitleStrong: {
+    fontFamily: Fonts.sansSemi,
+    color: Colors.ink,
+  },
+  codeField: {
     height: 64,
+    backgroundColor: Colors.surface,
+    borderRadius: Radii.md,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 12,
+    borderColor: Colors.divider,
+    justifyContent: 'center',
     paddingHorizontal: 16,
-    fontSize: 32,
     marginBottom: 16,
-    backgroundColor: '#fafafa',
-    letterSpacing: 12,
   },
-  resendButton: {
-    marginTop: 16,
-    padding: 12,
-    alignItems: 'center',
+  codeFieldFocused: {
+    borderColor: Colors.ink,
+    borderWidth: 1.5,
+  },
+  codeInput: {
+    fontFamily: Fonts.monoSemi,
+    fontSize: 28,
+    letterSpacing: 10,
+    color: Colors.ink,
+    paddingVertical: 0,
+    height: 48,
+  },
+  resendBtn: {
+    alignSelf: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: 'transparent',
+    marginBottom: 28,
   },
   resendText: {
-    color: '#007AFF',
-    fontSize: 16,
+    ...Type.bodySub,
   },
-  resendTextDisabled: {
-    color: '#8e8e93',
+  resendActive: {
+    color: Colors.ink,
+    textDecorationLine: 'underline',
+  },
+  resendDisabled: {
+    color: Colors.inkMuted,
+  },
+  cta: {
+    marginTop: 4,
+  },
+  backLink: {
+    alignSelf: 'center',
+    marginTop: 28,
+    paddingTop: 8,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.divider,
+  },
+  backText: {
+    ...Type.caption,
+    color: Colors.inkSub,
   },
 });
