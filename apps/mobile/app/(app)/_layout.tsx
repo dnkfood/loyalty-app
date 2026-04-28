@@ -1,22 +1,37 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Colors, Fonts } from '../../src/theme/tokens';
 
 export default function AppTabLayout() {
   return (
     <Tabs
       initialRouteName="card"
       screenOptions={{
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: '#8E8E93',
-        headerShown: true,
+        headerShown: false,
+        tabBarActiveTintColor: Colors.ink,
+        tabBarInactiveTintColor: Colors.inkMuted,
+        tabBarStyle: {
+          backgroundColor: Colors.surface,
+          borderTopColor: Colors.divider,
+          borderTopWidth: 1,
+          height: 78,
+          paddingTop: 8,
+          paddingBottom: 18,
+        },
+        tabBarLabelStyle: {
+          fontFamily: Fonts.sansSemi,
+          fontSize: 10,
+          letterSpacing: 0.4,
+          textTransform: 'uppercase',
+        },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Профиль',
-          tabBarIcon: ({ focused, color, size }) => (
-            <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color} />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person-outline" size={size} color={color} />
           ),
         }}
       />
@@ -24,8 +39,8 @@ export default function AppTabLayout() {
         name="transactions"
         options={{
           title: 'История',
-          tabBarIcon: ({ focused, color, size }) => (
-            <Ionicons name={focused ? 'list' : 'list-outline'} size={size} color={color} />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="list-outline" size={size} color={color} />
           ),
         }}
       />
@@ -33,8 +48,8 @@ export default function AppTabLayout() {
         name="card"
         options={{
           title: 'Карта',
-          tabBarIcon: ({ focused, color, size }) => (
-            <Ionicons name={focused ? 'qr-code' : 'qr-code-outline'} size={size} color={color} />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="qr-code-outline" size={size} color={color} />
           ),
         }}
       />
@@ -42,8 +57,8 @@ export default function AppTabLayout() {
         name="offers"
         options={{
           title: 'Уведомления',
-          tabBarIcon: ({ focused, color, size }) => (
-            <Ionicons name={focused ? 'notifications' : 'notifications-outline'} size={size} color={color} />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="notifications-outline" size={size} color={color} />
           ),
         }}
       />

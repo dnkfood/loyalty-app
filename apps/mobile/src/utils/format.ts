@@ -3,6 +3,116 @@ const MONTHS_SHORT = [
   'июл.', 'авг.', 'сент.', 'окт.', 'нояб.', 'дек.',
 ];
 
+const MONTHS_LONG = [
+  'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+  'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
+];
+
+function pad2(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+function isSameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function startOfDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+/**
+ * Friendly relative date for transaction lists:
+ * "Сегодня, 21:14" / "Вчера" / "14 марта" / "14 марта 2024"
+ */
+export function formatTxDate(dateStr: string | Date): string {
+  const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+  const now = new Date();
+  if (isSameDay(date, now)) {
+    return `Сегодня, ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+  }
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (isSameDay(date, yesterday)) {
+    return 'Вчера';
+  }
+  const day = date.getDate();
+  const monthFull = MONTHS_GENITIVE[date.getMonth()];
+  if (date.getFullYear() === now.getFullYear()) {
+    return `${day} ${monthFull}`;
+  }
+  return `${day} ${monthFull} ${date.getFullYear()}`;
+}
+
+const MONTHS_GENITIVE = [
+  'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+  'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
+];
+
+export type TxGroupKey =
+  | { kind: 'today' }
+  | { kind: 'yesterday' }
+  | { kind: 'thisWeek' }
+  | { kind: 'month'; year: number; month: number };
+
+export interface TxGroup<T> {
+  key: string;
+  label: string;
+  items: T[];
+}
+
+/**
+ * Group transactions chronologically:
+ * Today / Yesterday / This week / by month.
+ */
+export function groupTransactions<T extends { occurredAt: Date | string }>(
+  items: T[],
+): TxGroup<T>[] {
+  const now = new Date();
+  const today = startOfDay(now);
+  const yesterday = startOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
+  const sevenDaysAgo = startOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7));
+
+  const buckets = new Map<string, TxGroup<T>>();
+  const order: string[] = [];
+
+  function push(key: string, label: string, item: T) {
+    let g = buckets.get(key);
+    if (!g) {
+      g = { key, label, items: [] };
+      buckets.set(key, g);
+      order.push(key);
+    }
+    g.items.push(item);
+  }
+
+  for (const item of items) {
+    const d = typeof item.occurredAt === 'string' ? new Date(item.occurredAt) : item.occurredAt;
+    const day = startOfDay(d);
+    if (day.getTime() === today.getTime()) {
+      push('today', 'Сегодня', item);
+    } else if (day.getTime() === yesterday.getTime()) {
+      push('yesterday', 'Вчера', item);
+    } else if (day.getTime() >= sevenDaysAgo.getTime() && day.getTime() < yesterday.getTime()) {
+      push('week', 'На этой неделе', item);
+    } else {
+      const y = d.getFullYear();
+      const m = d.getMonth();
+      const key = `m_${y}_${m}`;
+      const monthLabel = MONTHS_LONG[m];
+      const label = y === now.getFullYear() ? monthLabel : `${monthLabel} ${y}`;
+      push(key, label, item);
+    }
+  }
+
+  return order.map((k) => buckets.get(k)!);
+}
+
 /**
  * Formats a number with space as thousands separator (ru-RU style).
  * Example: 12345.67 → "12 345,67"

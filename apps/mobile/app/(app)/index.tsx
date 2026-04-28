@@ -7,17 +7,27 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
-import { BalanceCard } from '../../src/components/loyalty/BalanceCard';
-import { Card } from '../../src/components/ui/Card';
+import { useRouter } from 'expo-router';
 import { useBalance } from '../../src/hooks/useBalance';
 import { useTransactions } from '../../src/hooks/useTransactions';
 import { useAuthStore } from '../../src/stores/auth.store';
 import { clearTokens } from '../../src/utils/token';
 import { ErrorBoundary } from '../../src/components/ErrorBoundary';
-import { formatPoints, formatRelativeTime, mapTransactionLabel } from '../../src/utils/format';
+import {
+  formatPoints,
+  formatTxDate,
+  mapTransactionLabel,
+} from '../../src/utils/format';
+import { ScreenContainer } from '../../src/theme/ScreenContainer';
+import { AppHeader } from '../../src/components/ui/AppHeader';
+import { HeroCard } from '../../src/components/ui/HeroCard';
+import { SectionHead } from '../../src/components/ui/SectionHead';
+import { OpRow, type OpRowData } from '../../src/components/ui/OpRow';
+import { Colors, Type, Fonts, Spacing, Radii } from '../../src/theme/tokens';
 import type { TransactionItem } from '@loyalty/shared-types';
 
 function HomeContent() {
+  const router = useRouter();
   const balance = useBalance();
   const transactions = useTransactions();
   const logout = useAuthStore((s) => s.logout);
@@ -37,7 +47,17 @@ function HomeContent() {
   };
 
   const recentItems: TransactionItem[] =
-    transactions.data?.pages[0]?.items.slice(0, 3) ?? [];
+    transactions.data?.pages[0]?.items.slice(0, 2) ?? [];
+
+  const recentRows: OpRowData[] = recentItems.map((tx) => ({
+    id: tx.id,
+    name:
+      mapTransactionLabel(tx.description) ||
+      txTypeLabel(tx.type),
+    date: formatTxDate(tx.occurredAt),
+    amount: tx.amount,
+    positive: tx.type === 'earn',
+  }));
 
   const refreshing = balance.isRefetching || transactions.isRefetching;
   const onRefresh = () => {
@@ -45,25 +65,41 @@ function HomeContent() {
     void transactions.refetch();
   };
 
+  const data = balance.data;
+  const currentSpend = data?.currentSpend ?? 0;
+  const nextLevelPoints = data?.nextLevelPoints ?? null;
+  const isMaxLevel = nextLevelPoints == null || nextLevelPoints <= 0;
+  const total = isMaxLevel ? 1 : currentSpend + nextLevelPoints;
+  const ratio = isMaxLevel ? 1 : Math.max(0, Math.min(1, currentSpend / total));
+  const progressPct = `${Math.round(ratio * 100)}%` as `${number}%`;
+
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
-      <View style={styles.content}>
-        {balance.isLoading && (
+    <ScreenContainer>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.ink} />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        <AppHeader
+          title="Профиль"
+          rightIcon="sunny-outline"
+          onRightPress={() => Alert.alert('Тёмная тема', 'Скоро будет.')}
+        />
+
+        {balance.isLoading && !data && (
           <View style={styles.placeholder}>
-            <Text style={styles.placeholderText}>Загрузка...</Text>
+            <Text style={styles.placeholderText}>Загрузка…</Text>
           </View>
         )}
 
-        {balance.isError && (
+        {balance.isError && !data && (
           <View style={styles.error}>
             <Text style={styles.errorText}>Не удалось загрузить данные</Text>
             <TouchableOpacity
-              style={styles.retryButton}
+              style={styles.retryBtn}
               onPress={() => void balance.refetch()}
             >
               <Text style={styles.retryText}>Повторить</Text>
@@ -71,62 +107,81 @@ function HomeContent() {
           </View>
         )}
 
-        {balance.data && (
+        {data && (
           <>
-            <BalanceCard
-              guestName={balance.data.guestName}
-              balance={balance.data.balance}
-              statusLevel={balance.data.statusLevel}
-              statusName={balance.data.statusName}
-              bonusPercent={balance.data.bonusPercent}
-              currentSpend={balance.data.currentSpend}
-              nextLevelPoints={balance.data.nextLevelPoints ?? undefined}
-            />
-
-            <Card style={styles.txCard} padding={20}>
-              <Text style={styles.sectionTitle}>Последние операции</Text>
-              {recentItems.length === 0 ? (
-                <Text style={styles.emptyText}>Пока нет операций</Text>
-              ) : (
-                recentItems.map((item, idx) => (
-                  <View
-                    key={item.id}
-                    style={[
-                      styles.txRow,
-                      idx < recentItems.length - 1 && styles.txRowDivider,
-                    ]}
-                  >
-                    <View style={styles.txMain}>
-                      <Text style={styles.txDescription} numberOfLines={1}>
-                        {mapTransactionLabel(item.description) || txTypeLabel(item.type)}
-                      </Text>
-                      <Text style={styles.txDate}>
-                        {formatRelativeTime(item.occurredAt)}
-                      </Text>
-                    </View>
-                    <Text
-                      style={[
-                        styles.txAmount,
-                        item.type === 'spend'
-                          ? styles.txAmountNegative
-                          : styles.txAmountPositive,
-                      ]}
-                    >
-                      {item.type === 'spend' ? '-' : '+'}
-                      {formatPoints(Math.abs(item.amount))}
+            <View style={styles.heroWrap}>
+              <HeroCard tier={data.statusName?.toUpperCase() || data.statusLevel}>
+                <View style={styles.heroBody}>
+                  <Text style={styles.balanceLabel}>БАЛАНС</Text>
+                  <View style={styles.balanceRow}>
+                    <Text style={styles.balanceNum}>
+                      {formatPoints(data.balance)}
                     </Text>
+                    <Text style={styles.balanceCurrency}> ₽</Text>
                   </View>
-                ))
-              )}
-            </Card>
+                  {data.guestName ? (
+                    <Text style={styles.ownerName} numberOfLines={1}>
+                      {data.guestName.toUpperCase()}
+                    </Text>
+                  ) : null}
+                </View>
+              </HeroCard>
+            </View>
 
-            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-              <Text style={styles.logoutText}>Выйти</Text>
+            <View style={styles.levelBlock}>
+              <View style={styles.levelHeader}>
+                <Text style={styles.levelLabel}>УРОВЕНЬ</Text>
+                <Text style={styles.levelName}>
+                  {(data.statusName || data.statusLevel || '').toUpperCase()}
+                </Text>
+              </View>
+              <View style={styles.levelMeta}>
+                <Text style={styles.levelMetaText}>
+                  Кэшбэк {data.bonusPercent}%
+                </Text>
+                <Text style={styles.levelMetaText}>
+                  {isMaxLevel
+                    ? 'Максимальный уровень'
+                    : `До следующего: ${formatPoints(nextLevelPoints!)} ₽`}
+                </Text>
+              </View>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: progressPct }]} />
+              </View>
+            </View>
+
+            <View style={styles.opsBlock}>
+              <SectionHead
+                label="ПОСЛЕДНИЕ ОПЕРАЦИИ"
+                actionLabel="Все"
+                onAction={() => router.push('/(app)/transactions' as never)}
+              />
+              <View style={styles.opsCard}>
+                {recentRows.length === 0 ? (
+                  <Text style={styles.emptyText}>Пока нет операций</Text>
+                ) : (
+                  recentRows.map((row, idx) => (
+                    <OpRow
+                      key={row.id}
+                      item={row}
+                      showDivider={idx > 0}
+                    />
+                  ))
+                )}
+              </View>
+            </View>
+
+            <TouchableOpacity
+              onPress={handleLogout}
+              activeOpacity={0.5}
+              style={styles.logoutBtn}
+            >
+              <Text style={styles.logoutText}>Выйти из аккаунта</Text>
             </TouchableOpacity>
           </>
         )}
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </ScreenContainer>
   );
 }
 
@@ -152,101 +207,158 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f2f2f7',
-  },
-  content: {
-    padding: 16,
-    gap: 16,
-  },
+  container: { flex: 1, backgroundColor: Colors.bg },
+  content: { paddingBottom: 100 },
+
   placeholder: {
+    margin: Spacing.xl,
     height: 180,
-    borderRadius: 16,
-    backgroundColor: '#e5e5ea',
+    borderRadius: Radii.xl,
+    backgroundColor: Colors.bgAlt,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  placeholderText: {
-    color: '#8e8e93',
-    fontSize: 16,
-  },
+  placeholderText: { ...Type.body, color: Colors.inkMuted },
   error: {
-    padding: 16,
-    backgroundColor: '#fff3cd',
-    borderRadius: 12,
+    margin: Spacing.xl,
+    padding: Spacing.lg,
+    backgroundColor: Colors.surface,
+    borderRadius: Radii.md,
+    borderWidth: 1,
+    borderColor: Colors.divider,
   },
-  errorText: {
-    color: '#856404',
-    textAlign: 'center',
-  },
-  retryButton: {
-    marginTop: 12,
+  errorText: { ...Type.body, textAlign: 'center', color: Colors.inkSub },
+  retryBtn: {
+    marginTop: Spacing.md,
     alignSelf: 'center',
-    backgroundColor: '#007AFF',
+    backgroundColor: Colors.ink,
     paddingHorizontal: 20,
     paddingVertical: 8,
-    borderRadius: 8,
+    borderRadius: Radii.pill,
   },
-  retryText: {
-    color: '#fff',
-    fontWeight: '600',
+  retryText: { color: Colors.heroInk, fontFamily: Fonts.sansSemi, fontSize: 13 },
+
+  heroWrap: {
+    paddingHorizontal: Spacing.xl,
   },
-  txCard: {},
-  sectionTitle: {
+
+  heroBody: {
+    marginTop: 8,
+  },
+  balanceLabel: {
+    fontFamily: Fonts.sansSemi,
+    fontSize: 11,
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+    color: Colors.heroMuted,
+    marginBottom: 8,
+  },
+  balanceRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  balanceNum: {
+    fontFamily: Fonts.monoSemi,
+    fontSize: 38,
+    lineHeight: 42,
+    color: Colors.heroInk,
+    letterSpacing: -0.5,
+  },
+  balanceCurrency: {
+    fontFamily: Fonts.sansMed,
     fontSize: 16,
-    fontWeight: '700',
-    color: '#1c1c1e',
-    marginBottom: 12,
+    color: Colors.heroMuted,
+    marginBottom: 6,
+    marginLeft: 2,
+  },
+  ownerName: {
+    marginTop: 14,
+    fontFamily: Fonts.sansSemi,
+    fontSize: 11,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: Colors.heroInk,
+  },
+
+  levelBlock: {
+    marginTop: Spacing.xxl,
+    marginHorizontal: Spacing.xl,
+    padding: 18,
+    borderRadius: Radii.lg,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    backgroundColor: Colors.surface,
+  },
+  levelHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: 10,
+  },
+  levelLabel: {
+    fontFamily: Fonts.sansSemi,
+    fontSize: 11,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: Colors.inkMuted,
+  },
+  levelName: {
+    fontFamily: Fonts.sansSemi,
+    fontSize: 13,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: Colors.ink,
+  },
+  levelMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  levelMetaText: {
+    ...Type.bodySub,
+    color: Colors.inkSub,
+  },
+  progressTrack: {
+    height: 2,
+    backgroundColor: Colors.divider,
+    borderRadius: 1,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: Colors.ink,
+  },
+
+  opsBlock: {
+    marginTop: Spacing.xxl,
+  },
+  opsCard: {
+    marginHorizontal: Spacing.xl,
+    backgroundColor: Colors.surface,
+    borderRadius: Radii.lg,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    overflow: 'hidden',
+    paddingHorizontal: 0,
   },
   emptyText: {
-    fontSize: 14,
-    color: '#8e8e93',
+    ...Type.bodySub,
     textAlign: 'center',
-    paddingVertical: 16,
+    paddingVertical: 24,
+    color: Colors.inkMuted,
   },
-  txRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  txRowDivider: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e5e5ea',
-  },
-  txMain: {
-    flex: 1,
-  },
-  txDescription: {
-    fontSize: 15,
-    color: '#1c1c1e',
-    fontWeight: '500',
-  },
-  txDate: {
-    fontSize: 12,
-    color: '#8e8e93',
-    marginTop: 2,
-  },
-  txAmount: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginLeft: 12,
-  },
-  txAmountPositive: {
-    color: '#34c759',
-  },
-  txAmountNegative: {
-    color: '#ff3b30',
-  },
-  logoutButton: {
-    backgroundColor: '#ff3b30',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
+
+  logoutBtn: {
+    alignSelf: 'center',
+    marginTop: 32,
+    paddingTop: 12,
+    paddingBottom: 8,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.divider,
   },
   logoutText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    ...Type.caption,
+    color: Colors.inkMuted,
   },
 });

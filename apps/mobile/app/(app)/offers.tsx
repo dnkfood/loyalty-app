@@ -2,6 +2,9 @@ import { FlatList, StyleSheet, View, Text, RefreshControl } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../src/api/client';
 import { formatRelativeTime } from '../../src/utils/format';
+import { ScreenContainer } from '../../src/theme/ScreenContainer';
+import { AppHeader } from '../../src/components/ui/AppHeader';
+import { Colors, Type, Fonts, Spacing, Radii } from '../../src/theme/tokens';
 import type { ApiSuccessResponse } from '@loyalty/shared-types';
 
 interface Notification {
@@ -34,12 +37,15 @@ export default function NotificationsScreen() {
   });
 
   return (
-    <View style={styles.container}>
+    <ScreenContainer>
+      <AppHeader title="Уведомления" />
+
       {isError && (
         <View style={styles.error}>
           <Text style={styles.errorText}>Не удалось загрузить уведомления</Text>
         </View>
       )}
+
       <FlatList
         data={notifications ?? []}
         keyExtractor={(item) => item.id}
@@ -55,7 +61,11 @@ export default function NotificationsScreen() {
           </View>
         )}
         refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={() => void refetch()} />
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={() => void refetch()}
+            tintColor={Colors.ink}
+          />
         }
         ListEmptyComponent={
           !isLoading ? (
@@ -66,26 +76,38 @@ export default function NotificationsScreen() {
         }
         contentContainerStyle={styles.list}
       />
-    </View>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f2f2f7' },
-  list: { padding: 16 },
-  error: { margin: 16, padding: 12, backgroundColor: '#fff3cd', borderRadius: 8 },
-  errorText: { color: '#856404', textAlign: 'center' },
-  empty: { padding: 32, alignItems: 'center' },
-  emptyText: { color: '#8e8e93', fontSize: 16 },
+  list: {
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: 100,
+  },
+  error: {
+    marginHorizontal: Spacing.xl,
+    marginBottom: Spacing.md,
+    padding: 12,
+    borderRadius: Radii.md,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    backgroundColor: Colors.surface,
+  },
+  errorText: { ...Type.bodySub, textAlign: 'center', color: Colors.inkSub },
+  empty: { padding: 40, alignItems: 'center' },
+  emptyText: { ...Type.body, color: Colors.inkMuted },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: Colors.surface,
+    borderRadius: Radii.md,
+    borderWidth: 1,
+    borderColor: Colors.divider,
     padding: 16,
     marginBottom: 10,
   },
   cardUnread: {
     borderLeftWidth: 3,
-    borderLeftColor: '#007AFF',
+    borderLeftColor: Colors.ink,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -94,19 +116,17 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   cardTitle: {
+    fontFamily: Fonts.sansSemi,
     fontSize: 15,
-    fontWeight: '600',
-    color: '#1c1c1e',
+    color: Colors.ink,
     flex: 1,
     marginRight: 8,
   },
   cardDate: {
-    fontSize: 12,
-    color: '#8e8e93',
+    ...Type.caption,
   },
   cardBody: {
-    fontSize: 14,
-    color: '#3c3c43',
-    lineHeight: 20,
+    ...Type.bodySub,
+    color: Colors.inkSub,
   },
 });

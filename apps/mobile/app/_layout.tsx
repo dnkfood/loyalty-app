@@ -11,11 +11,24 @@ import { View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity
 import { Stack } from 'expo-router';
 import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Component, type ReactNode } from 'react';
+import {
+  useFonts,
+  Montserrat_400Regular,
+  Montserrat_500Medium,
+  Montserrat_600SemiBold,
+  Montserrat_700Bold,
+} from '@expo-google-fonts/montserrat';
+import {
+  JetBrainsMono_500Medium,
+  JetBrainsMono_600SemiBold,
+} from '@expo-google-fonts/jetbrains-mono';
 import { usePushNotifications } from '../src/hooks/usePushNotifications';
 import { useAuthStore } from '../src/stores/auth.store';
 import { getRefreshToken, saveTokens, clearTokens } from '../src/utils/token';
 import { getDeviceId, collectDeviceInfo } from '../src/utils/deviceInfo';
+import { Colors } from '../src/theme/tokens';
 import axios from 'axios';
 
 // Wire React Query focusManager to AppState so queries refetch when app returns to foreground
@@ -163,14 +176,14 @@ function RootLayout() {
   if (!ready) {
     return (
       <View style={s.loading}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={Colors.ink} />
         <Text style={s.loadingText}>Загрузка...</Text>
       </View>
     );
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.bg } }}>
       <Stack.Screen name="(auth)" redirect={authenticated} />
       <Stack.Screen name="(app)" redirect={!authenticated} />
     </Stack>
@@ -178,23 +191,42 @@ function RootLayout() {
 }
 
 export default function Layout() {
+  const [fontsLoaded] = useFonts({
+    Montserrat_400Regular,
+    Montserrat_500Medium,
+    Montserrat_600SemiBold,
+    Montserrat_700Bold,
+    JetBrainsMono_500Medium,
+    JetBrainsMono_600SemiBold,
+  });
+
+  if (!fontsLoaded) {
+    return (
+      <View style={s.loading}>
+        <ActivityIndicator size="large" color={Colors.ink} />
+      </View>
+    );
+  }
+
   return (
     <AppErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <StatusBar style="auto" />
-        <RootLayout />
-      </QueryClientProvider>
+      <SafeAreaProvider>
+        <QueryClientProvider client={queryClient}>
+          <StatusBar style="dark" />
+          <RootLayout />
+        </QueryClientProvider>
+      </SafeAreaProvider>
     </AppErrorBoundary>
   );
 }
 
 const s = StyleSheet.create({
-  loading: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' },
-  loadingText: { marginTop: 12, color: '#666', fontSize: 16 },
-  fatal: { flex: 1, backgroundColor: '#1a1a1a', padding: 20, paddingTop: 60 },
+  loading: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.bg },
+  loadingText: { marginTop: 12, color: Colors.inkSub, fontSize: 16 },
+  fatal: { flex: 1, backgroundColor: Colors.hero, padding: 20, paddingTop: 60 },
   fatalTitle: { color: '#ff4444', fontSize: 20, fontWeight: 'bold', marginBottom: 12 },
   scroll: { flex: 1 },
-  mono: { color: '#eee', fontSize: 12, fontFamily: 'monospace' },
-  btn: { backgroundColor: '#007AFF', padding: 14, borderRadius: 8, alignItems: 'center', marginTop: 16 },
-  btnTxt: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  mono: { color: Colors.heroInk, fontSize: 12, fontFamily: 'monospace' },
+  btn: { backgroundColor: Colors.ink, padding: 14, borderRadius: 8, alignItems: 'center', marginTop: 16 },
+  btnTxt: { color: Colors.heroInk, fontSize: 16, fontWeight: '600' },
 });
