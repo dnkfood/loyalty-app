@@ -54,3 +54,8 @@ logs/
 *.p12
 *.pem
 certs/
+
+# Android release keystores (debug.keystore is intentionally tracked)
+*.keystore
+*.jks
+!apps/mobile/android/app/debug.keystore
