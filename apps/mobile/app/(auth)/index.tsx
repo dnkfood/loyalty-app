@@ -76,7 +76,7 @@ export default function PhoneScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.brandWrap}>
-            <Text style={styles.brandText}>DNK</Text>
+            <Text style={styles.brandText}>DNK FOOD</Text>
           </View>
 
           <Text style={styles.title}>Вход</Text>
@@ -144,9 +144,9 @@ const styles = StyleSheet.create({
   },
   brandText: {
     fontFamily: Fonts.sansBold,
-    fontSize: 28,
+    fontSize: 24,
     color: Colors.ink,
-    letterSpacing: 6,
+    letterSpacing: 3.5,
   },
   title: {
     ...Type.title,

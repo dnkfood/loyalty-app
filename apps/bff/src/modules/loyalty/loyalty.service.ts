@@ -40,6 +40,7 @@ export class LoyaltyService {
       statusLevel: cached.statusLevel,
       statusName: cached.statusName,
       nextLevelPoints: cached.nextLevelPoints,
+      nextLevelName: cached.nextLevelName,
       bonusPercent: cached.bonusPercent,
       cardCode: cached.externalGuestId,
       // Prefer the user's stored name; fall back to whatever loyalty had.

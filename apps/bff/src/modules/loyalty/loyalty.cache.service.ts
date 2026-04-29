@@ -24,7 +24,19 @@ export type LoyaltyCacheDto = LoyaltyCache & {
   bonusPercent: number;
   guestName: string | null;
   currentSpend: number | null;
+  nextLevelName: string | null;
 };
+
+function computeNextLevelName(
+  statusLevel: string,
+  levels: { name: string }[],
+): string | null {
+  if (!levels?.length) return null;
+  const target = statusLevel.trim().toUpperCase();
+  const idx = levels.findIndex((l) => l.name.trim().toUpperCase() === target);
+  if (idx < 0 || idx >= levels.length - 1) return null;
+  return levels[idx + 1].name;
+}
 
 @Injectable()
 export class LoyaltyCacheService {
@@ -61,6 +73,7 @@ export class LoyaltyCacheService {
         statusLevel: guest.statusLevel,
         statusName: guest.statusLevel,
         nextLevelPoints: guest.nextLevelSumma != null ? Math.round(guest.nextLevelSumma) : null,
+        nextLevelName: computeNextLevelName(guest.statusLevel, guest.levels),
         segmentIds: [],
         bonusPercent: guest.bonusPercent,
         guestName: guest.guestName,
@@ -92,6 +105,7 @@ export class LoyaltyCacheService {
           statusLevel: dbCache.statusLevel,
           statusName: dbCache.statusName,
           nextLevelPoints: dbCache.nextLevelPoints,
+          nextLevelName: null,
           segmentIds: dbCache.segmentIds,
           // PG fallback doesn't carry these — service layer fills proxies.
           bonusPercent: 0,

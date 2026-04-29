@@ -141,11 +141,27 @@ function HomeContent() {
                 <Text style={styles.levelMetaText}>
                   Кэшбэк {data.bonusPercent}%
                 </Text>
-                <Text style={styles.levelMetaText}>
-                  {isMaxLevel
-                    ? 'Максимальный уровень'
-                    : `До следующего: ${formatPoints(nextLevelPoints!)} ₽`}
-                </Text>
+                {isMaxLevel ? (
+                  <Text style={styles.levelMaxText}>Максимальный уровень</Text>
+                ) : data.nextLevelName ? (
+                  <Text style={styles.levelMetaText}>
+                    До{' '}
+                    <Text style={styles.levelNextName}>
+                      {localizeLevelName(data.nextLevelName)}
+                    </Text>{' '}
+                    осталось{' '}
+                    <Text style={styles.levelNextAmount}>
+                      {formatPoints(nextLevelPoints!)} ₽
+                    </Text>
+                  </Text>
+                ) : (
+                  <Text style={styles.levelMetaText}>
+                    До следующего:{' '}
+                    <Text style={styles.levelNextAmount}>
+                      {formatPoints(nextLevelPoints!)} ₽
+                    </Text>
+                  </Text>
+                )}
               </View>
               <View style={styles.progressTrack}>
                 <View style={[styles.progressFill, { width: progressPct }]} />
@@ -318,6 +334,21 @@ const styles = StyleSheet.create({
   levelMetaText: {
     ...Type.bodySub,
     color: Colors.inkSub,
+    flexShrink: 1,
+    textAlign: 'right',
+  },
+  levelNextName: {
+    fontFamily: Fonts.sansSemi,
+    color: Colors.ink,
+  },
+  levelNextAmount: {
+    fontFamily: Fonts.monoSemi,
+    color: Colors.ink,
+  },
+  levelMaxText: {
+    ...Type.bodySub,
+    fontFamily: Fonts.sansSemi,
+    color: Colors.ink,
   },
   progressTrack: {
     height: 2,

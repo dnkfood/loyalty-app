@@ -84,6 +84,7 @@ export interface LoyaltyBalanceResponse {
   statusLevel: string;
   statusName: string;
   nextLevelPoints?: number | null;
+  nextLevelName?: string | null;
   bonusPercent: number;
   cardCode: string;
   guestName: string | null;
