@@ -21,6 +21,7 @@ import { AppHeader } from '../../src/components/ui/AppHeader';
 import { Chip } from '../../src/components/ui/Chip';
 import { useBrightnessBoost } from '../../src/hooks/useBrightnessBoost';
 import { Colors, Type, Fonts, Spacing, Radii, Shadow } from '../../src/theme/tokens';
+import { localizeLevelName } from '../../src/utils/levelName';
 
 function showToast(message: string) {
   if (Platform.OS === 'android') {
@@ -46,7 +47,7 @@ export default function CardScreen() {
     staleTime: 60_000,
   });
 
-  const tier = (balance.data?.statusName || balance.data?.statusLevel || '').toUpperCase() || 'FRIEND';
+  const tier = localizeLevelName(balance.data?.statusName || balance.data?.statusLevel) || 'Друзья';
   const code = card.data?.qrData ?? '';
   const refreshing = card.isRefetching || balance.isRefetching;
 
@@ -86,7 +87,7 @@ export default function CardScreen() {
         <View style={styles.heroWrap}>
           <View style={[styles.hero, Shadow.hero]}>
             <View style={styles.heroHeader}>
-              <Text style={styles.brandText}>DNK</Text>
+              <Text style={styles.brandText}>DNK FOOD</Text>
               <Chip label={tier} onHero />
             </View>
 
@@ -173,9 +174,9 @@ const styles = StyleSheet.create({
   },
   brandText: {
     fontFamily: Fonts.sansBold,
-    fontSize: 20,
+    fontSize: 16,
     color: Colors.heroInk,
-    letterSpacing: 4,
+    letterSpacing: 2.5,
   },
   qrPanel: {
     alignItems: 'center',

@@ -43,7 +43,6 @@ const styles = StyleSheet.create({
   label: {
     fontFamily: Fonts.sansSemi,
     fontSize: 10,
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
 });

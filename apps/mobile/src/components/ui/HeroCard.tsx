@@ -29,7 +29,7 @@ export function HeroCard({
     >
       <View style={styles.header}>
         <View style={styles.brand}>
-          <Text style={styles.brandText}>DNK</Text>
+          <Text style={styles.brandText}>DNK FOOD</Text>
         </View>
         {tier ? <Chip label={tier} onHero /> : null}
       </View>
@@ -57,8 +57,8 @@ const styles = StyleSheet.create({
   },
   brandText: {
     fontFamily: Fonts.sansBold,
-    fontSize: 22,
+    fontSize: 18,
     color: Colors.heroInk,
-    letterSpacing: 4,
+    letterSpacing: 2.5,
   },
 });

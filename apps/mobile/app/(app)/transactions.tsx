@@ -18,6 +18,7 @@ import {
   mapTransactionLabel,
 } from '../../src/utils/format';
 import { Colors, Type, Fonts, Spacing, Radii } from '../../src/theme/tokens';
+import { classifyTransaction } from '../../src/utils/transactionType';
 import type { TransactionItem } from '@loyalty/shared-types';
 
 function txTypeLabel(type: TransactionItem['type']): string {
@@ -53,8 +54,9 @@ export default function TransactionsScreen() {
     let earned = 0;
     let spent = 0;
     for (const tx of allItems) {
-      if (tx.type === 'earn') earned += Math.abs(tx.amount);
-      else spent += Math.abs(tx.amount);
+      const kind = classifyTransaction(tx);
+      if (kind === 'earn') earned += Math.abs(tx.amount);
+      else if (kind === 'spend') spent += Math.abs(tx.amount);
     }
     return { earned, spent };
   }, [allItems]);
@@ -71,7 +73,7 @@ export default function TransactionsScreen() {
           txTypeLabel(tx.type),
         date: formatTxDate(tx.occurredAt),
         amount: tx.amount,
-        positive: tx.type === 'earn',
+        kind: classifyTransaction(tx),
       })),
     }));
   }, [allItems]);

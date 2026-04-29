@@ -24,6 +24,8 @@ import { HeroCard } from '../../src/components/ui/HeroCard';
 import { SectionHead } from '../../src/components/ui/SectionHead';
 import { OpRow, type OpRowData } from '../../src/components/ui/OpRow';
 import { Colors, Type, Fonts, Spacing, Radii } from '../../src/theme/tokens';
+import { localizeLevelName } from '../../src/utils/levelName';
+import { classifyTransaction } from '../../src/utils/transactionType';
 import type { TransactionItem } from '@loyalty/shared-types';
 
 function HomeContent() {
@@ -56,7 +58,7 @@ function HomeContent() {
       txTypeLabel(tx.type),
     date: formatTxDate(tx.occurredAt),
     amount: tx.amount,
-    positive: tx.type === 'earn',
+    kind: classifyTransaction(tx),
   }));
 
   const refreshing = balance.isRefetching || transactions.isRefetching;
@@ -110,7 +112,7 @@ function HomeContent() {
         {data && (
           <>
             <View style={styles.heroWrap}>
-              <HeroCard tier={data.statusName?.toUpperCase() || data.statusLevel}>
+              <HeroCard tier={localizeLevelName(data.statusName || data.statusLevel)}>
                 <View style={styles.heroBody}>
                   <Text style={styles.balanceLabel}>БАЛАНС</Text>
                   <View style={styles.balanceRow}>
@@ -130,9 +132,9 @@ function HomeContent() {
 
             <View style={styles.levelBlock}>
               <View style={styles.levelHeader}>
-                <Text style={styles.levelLabel}>УРОВЕНЬ</Text>
+                <Text style={styles.levelLabel}>ВАШ УРОВЕНЬ</Text>
                 <Text style={styles.levelName}>
-                  {(data.statusName || data.statusLevel || '').toUpperCase()}
+                  {localizeLevelName(data.statusName || data.statusLevel)}
                 </Text>
               </View>
               <View style={styles.levelMeta}>
@@ -304,9 +306,8 @@ const styles = StyleSheet.create({
   },
   levelName: {
     fontFamily: Fonts.sansSemi,
-    fontSize: 13,
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
+    fontSize: 14,
+    letterSpacing: 0.2,
     color: Colors.ink,
   },
   levelMeta: {
